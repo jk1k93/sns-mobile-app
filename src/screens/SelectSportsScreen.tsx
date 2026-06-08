@@ -76,7 +76,7 @@ export default function SelectSportsScreen() {
           accessibilityRole="button"
           accessibilityLabel="Go back"
         >
-          <Ionicons name="arrow-back" size={24} color="#1A3C40" />
+          <Ionicons name="arrow-back" size={24} color={AppColors.primaryDark} />
         </Pressable>
       </View>
 

@@ -12,20 +12,7 @@ import {
 } from "react-native";
 
 import { AppColors } from "@/constants/app-colors";
-
-function parseIso(s: string): Date | null {
-  const t = s.trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return null;
-  const d = new Date(`${t}T12:00:00`);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-
-function formatIso(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
+import { formatIsoDate, parseIsoDate } from "@/lib/date";
 
 export type DatePickerFieldProps = {
   label: string;
@@ -45,21 +32,21 @@ export function DatePickerField({
   const [open, setOpen] = useState(false);
   const [temp, setTemp] = useState<Date>(() => {
     if (value) {
-      const p = parseIso(value);
+      const p = parseIsoDate(value);
       if (p) return p;
     }
     return new Date();
   });
 
   const display =
-    value && parseIso(value)
+    value && parseIsoDate(value)
       ? value
       : Platform.OS === "web"
         ? ""
         : "Select date";
 
   const onOpen = () => {
-    setTemp(value && parseIso(value) ? parseIso(value)! : new Date());
+    setTemp(value && parseIsoDate(value) ? parseIsoDate(value)! : new Date());
     setOpen(true);
   };
 
@@ -114,7 +101,7 @@ export function DatePickerField({
           onChange={(event, date) => {
             setOpen(false);
             if (event.type === "set" && date) {
-              onChange(formatIso(date));
+              onChange(formatIsoDate(date));
             }
           }}
         />
@@ -130,7 +117,7 @@ export function DatePickerField({
                 </Pressable>
                 <Pressable
                   onPress={() => {
-                    onChange(formatIso(temp));
+                    onChange(formatIsoDate(temp));
                     setOpen(false);
                   }}
                   hitSlop={12}

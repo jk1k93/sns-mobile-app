@@ -1,10 +1,44 @@
-import { apiFetchAuth } from '@/lib/api';
+import { apiFetch, apiFetchAuth } from '@/lib/api';
+
+type City = {
+  id: string;
+  name: string;
+  state: string;
+  country: string;
+  placeId: string;
+  latitude: number | null;
+  longitude: number | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type VenueWithCity = {
+  id: string;
+  name: string;
+  cityId: string;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  createdAt: string;
+  updatedAt: string;
+  city: City;
+};
+
+type SearchVenuesResponse = {
+  message: string;
+  data: VenueWithCity[];
+};
+
+type CreateVenueResponse = {
+  message: string;
+  data: VenueWithCity;
+};
 
 export type Venue = {
   id: string;
   name: string;
-  city?: string | null;
-  address?: string | null;
+  city: string | null;
+  address: string | null;
 };
 
 export type CreateVenuePayload = {
@@ -24,85 +58,31 @@ export type CreateVenuePayload = {
   };
 };
 
-type VenueApiShape = {
-  id: string;
-  name: string;
-  address?: string | null;
-  city?:
-    | string
-    | null
-    | {
-        name?: string | null;
-      };
-};
-
-function parseVenuesList(data: unknown): Venue[] {
-  if (Array.isArray(data)) {
-    return (data as VenueApiShape[]).map(normalizeVenue);
-  }
-  if (data && typeof data === 'object' && 'data' in data) {
-    const inner = (data as { data: unknown }).data;
-    if (Array.isArray(inner)) {
-      return (inner as VenueApiShape[]).map(normalizeVenue);
-    }
-  }
-  if (data && typeof data === 'object' && 'venues' in data) {
-    const inner = (data as { venues: unknown }).venues;
-    if (Array.isArray(inner)) {
-      return (inner as VenueApiShape[]).map(normalizeVenue);
-    }
-  }
-  return [];
-}
-
-function normalizeVenue(input: VenueApiShape): Venue {
-  const city =
-    typeof input.city === 'string'
-      ? input.city
-      : input.city?.name
-        ? input.city.name
-        : null;
-
+function toVenue(v: VenueWithCity): Venue {
   return {
-    id: input.id,
-    name: input.name,
-    city,
-    address: input.address ?? null,
+    id: v.id,
+    name: v.name,
+    city: v.city.name,
+    address: v.address,
   };
 }
 
-function parseVenue(data: unknown): Venue {
-  if (data && typeof data === 'object' && 'data' in data) {
-    const inner = (data as { data: unknown }).data;
-    if (inner && typeof inner === 'object' && 'id' in inner) {
-      return normalizeVenue(inner as VenueApiShape);
-    }
-  }
-  if (data && typeof data === 'object' && 'venue' in data) {
-    const inner = (data as { venue: unknown }).venue;
-    if (inner && typeof inner === 'object' && 'id' in inner) {
-      return normalizeVenue(inner as VenueApiShape);
-    }
-  }
-  return normalizeVenue(data as VenueApiShape);
-}
-
-export async function fetchVenues(token: string, q?: string): Promise<Venue[]> {
+export async function fetchVenues(q?: string): Promise<Venue[]> {
   const query = q?.trim();
   const path = query
     ? `/venues/search?q=${encodeURIComponent(query)}`
     : '/venues/search';
-  const data = await apiFetchAuth<unknown>(path, token, { method: 'GET' });
-  return parseVenuesList(data);
+  const { data } = await apiFetch<SearchVenuesResponse>(path, { method: 'GET' });
+  return data.map(toVenue);
 }
 
 export async function createVenue(
   token: string,
   payload: CreateVenuePayload
 ): Promise<Venue> {
-  const data = await apiFetchAuth<unknown>('/venues', token, {
+  const { data } = await apiFetchAuth<CreateVenueResponse>('/venues', token, {
     method: 'POST',
     body: JSON.stringify(payload),
   });
-  return parseVenue(data);
+  return toVenue(data);
 }

@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useMemo } from "react";
 import {
@@ -15,50 +14,33 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { fetchVenues } from "@/api/venues";
 import { DatePickerField } from "@/components/tournament/date-picker-field";
 import { VenueSearchField } from "@/components/tournament/venue-search-field";
 import { ThemedView } from "@/components/themed-view";
 import { PrimaryButton } from "@/components/ui/primary-button";
 import { AppColors } from "@/constants/app-colors";
-import { useAuth } from "@/contexts/auth-context";
 import { useTournamentDraft } from "@/contexts/tournament-draft-context";
 import { useHideTabBarWhileFocused } from "@/hooks/use-hide-tab-bar";
-
-function parseIsoDate(s: string): Date | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
-  const d = new Date(`${s}T12:00:00`);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
+import { parseIsoDate } from "@/lib/date";
 
 export default function TournamentCreateStep1Screen() {
   const router = useRouter();
-  const { accessToken } = useAuth();
   const draft = useTournamentDraft();
   useHideTabBarWhileFocused();
-
-  const venuesQuery = useQuery({
-    queryKey: ["venues"],
-    queryFn: () => fetchVenues(accessToken!),
-    enabled: Boolean(accessToken),
-  });
 
   const startAsDate = useMemo(() => {
     if (!draft.draft.startDate) return undefined;
     return parseIsoDate(draft.draft.startDate) ?? undefined;
   }, [draft.draft.startDate]);
 
-  const canContinue =
-    draft.draft.name.trim().length > 0 &&
-    draft.draft.startDate !== null &&
-    draft.draft.endDate !== null &&
-    draft.draft.venue !== null &&
-    (() => {
-      const a = parseIsoDate(draft.draft.startDate!);
-      const b = parseIsoDate(draft.draft.endDate!);
-      if (!a || !b) return false;
-      return b.getTime() >= a.getTime();
-    })();
+  const canContinue = useMemo(() => {
+    const { name, startDate, endDate, venue } = draft.draft;
+    if (!name.trim() || !startDate || !endDate || !venue) return false;
+    const a = parseIsoDate(startDate);
+    const b = parseIsoDate(endDate);
+    if (!a || !b) return false;
+    return b.getTime() >= a.getTime();
+  }, [draft.draft]);
 
   const onContinue = () => {
     if (!canContinue) return;
@@ -118,22 +100,11 @@ export default function TournamentCreateStep1Screen() {
               minimumDate={startAsDate}
             />
 
-            {venuesQuery.isPending ? (
-              <Text style={styles.loadingVenues}>Loading venues…</Text>
-            ) : null}
-
             <VenueSearchField
-              venues={venuesQuery.data ?? []}
               value={draft.draft.venue}
               onChange={draft.setVenue}
               onAddNewVenue={() => router.push("/tournaments/add-venue")}
             />
-
-            {venuesQuery.isError ? (
-              <Text style={styles.errorText}>
-                Could not load venues. Check your connection and try again.
-              </Text>
-            ) : null}
 
             <PrimaryButton
               title="Continue"
@@ -199,16 +170,6 @@ const styles = StyleSheet.create({
     color: AppColors.textDark,
     backgroundColor: AppColors.white,
     marginBottom: 16,
-  },
-  errorText: {
-    color: AppColors.error,
-    fontSize: 14,
-    marginBottom: 12,
-  },
-  loadingVenues: {
-    fontSize: 14,
-    color: AppColors.textMuted,
-    marginBottom: 8,
   },
   continueBtn: {
     marginTop: 8,

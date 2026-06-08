@@ -53,7 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
-    (async () => {
+    async function bootstrap() {
       try {
         const token = await getAuthToken();
         if (cancelled) return;
@@ -85,7 +85,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsReady(true);
         }
       }
-    })();
+    }
+
+    void bootstrap();
 
     return () => {
       cancelled = true;

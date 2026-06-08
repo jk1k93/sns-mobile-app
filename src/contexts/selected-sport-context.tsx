@@ -39,7 +39,7 @@ export function SelectedSportProvider({ children }: { children: React.ReactNode 
   useEffect(() => {
     let cancelled = false;
 
-    (async () => {
+    async function loadSportPreference() {
       if (!user) {
         setSelectedSportId(null);
         setIsSportPreferenceReady(true);
@@ -52,7 +52,9 @@ export function SelectedSportProvider({ children }: { children: React.ReactNode 
         setSelectedSportId(id);
         setIsSportPreferenceReady(true);
       }
-    })();
+    }
+
+    void loadSportPreference();
 
     return () => {
       cancelled = true;

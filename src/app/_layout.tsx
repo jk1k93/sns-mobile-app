@@ -40,9 +40,11 @@ function AuthenticatedRoot() {
   }
   /** Renders matched file routes (e.g. `(tabs)`); `children` on root `_layout` is not the route outlet. */
   return (
-    <View style={{ flex: 1 }}>
-      <Slot />
-    </View>
+    <LocationProvider>
+      <View style={{ flex: 1 }}>
+        <Slot />
+      </View>
+    </LocationProvider>
   );
 }
 
@@ -59,18 +61,16 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   return (
     <QueryProvider>
-      <LocationProvider>
-        <AuthProvider>
-          <SelectedSportProvider>
-            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-              <AnimatedSplashOverlay />
-              <AuthBootstrapGate>
-                <AuthenticatedRoot />
-              </AuthBootstrapGate>
-            </ThemeProvider>
-          </SelectedSportProvider>
-        </AuthProvider>
-      </LocationProvider>
+      <AuthProvider>
+        <SelectedSportProvider>
+          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+            <AnimatedSplashOverlay />
+            <AuthBootstrapGate>
+              <AuthenticatedRoot />
+            </AuthBootstrapGate>
+          </ThemeProvider>
+        </SelectedSportProvider>
+      </AuthProvider>
     </QueryProvider>
   );
 }

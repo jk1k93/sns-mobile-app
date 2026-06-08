@@ -1,13 +1,17 @@
+import dayjs from 'dayjs';
+import customParseFormat from 'dayjs/plugin/customParseFormat';
+
 import { apiFetch, apiFetchAuth } from '@/lib/api';
+
+dayjs.extend(customParseFormat);
 
 export type User = {
   id: string;
   name: string | null;
   phoneNumber: string;
   email: string | null;
-  gender: string | null;
-  /** Optional until backend supports it on profile. */
-  dateOfBirth?: string | null;
+  gender: 'M' | 'F' | null;
+  dateOfBirth: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -44,27 +48,17 @@ export type ProfileFetchResult = {
   user: User;
 };
 
-function parseProfileResponse(data: unknown): ProfileFetchResult {
-  if (data && typeof data === 'object' && 'data' in data) {
-    const inner = (data as { data: unknown }).data;
-    if (inner && typeof inner === 'object' && 'user' in inner) {
-      const d = inner as { newUser?: boolean; user: User };
-      return {
-        newUser: Boolean(d.newUser),
-        user: d.user,
-      };
-    }
-  }
-  if (data && typeof data === 'object' && 'user' in data && !('data' in data)) {
-    const wrapped = data as { user: User };
-    return { newUser: false, user: wrapped.user };
-  }
-  return { newUser: false, user: data as User };
-}
+type ProfileResponse = {
+  message: string;
+  data: {
+    newUser: boolean;
+    user: User;
+  };
+};
 
 export async function fetchProfile(token: string): Promise<ProfileFetchResult> {
-  const data = await apiFetchAuth<unknown>('/profile', token, { method: 'GET' });
-  return parseProfileResponse(data);
+  const { data } = await apiFetchAuth<ProfileResponse>('/profile', token, { method: 'GET' });
+  return data;
 }
 
 /** Form → `PATCH /profile` (UI uses male/female; API uses M/F). */
@@ -86,33 +80,26 @@ export type PatchProfileBody = {
   dateOfBirth?: string | null;
 };
 
-function canonicalDateOfBirth(value: string | null | undefined): string {
-  if (value == null) return '';
+const DATE_FORMATS = ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD-MM-YYYY'];
+
+function toIsoDate(value: string): string {
   const t = value.trim();
   if (!t) return '';
-  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
-  const m = t.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
-  if (m) {
-    const dd = m[1].padStart(2, '0');
-    const mm = m[2].padStart(2, '0');
-    const yyyy = m[3];
-    return `${yyyy}-${mm}-${dd}`;
+  for (const fmt of DATE_FORMATS) {
+    const d = dayjs(t, fmt, true);
+    if (d.isValid()) return d.format('YYYY-MM-DD');
   }
   return t;
 }
 
+function canonicalDateOfBirth(value: string | null): string {
+  if (value == null) return '';
+  return toIsoDate(value);
+}
+
 /** Converts user input to YYYY-MM-DD when possible; otherwise returns trimmed string (API may 400). */
 function formDateToApiFormat(formInput: string): string {
-  const t = formInput.trim();
-  if (!t) return '';
-  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
-  const m = t.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
-  if (m) {
-    const dd = m[1].padStart(2, '0');
-    const mm = m[2].padStart(2, '0');
-    return `${m[3]}-${mm}-${dd}`;
-  }
-  return t;
+  return toIsoDate(formInput);
 }
 
 /**
@@ -158,9 +145,9 @@ export async function saveProfile(
   token: string,
   body: PatchProfileBody
 ): Promise<ProfileFetchResult> {
-  const data = await apiFetchAuth<unknown>('/profile', token, {
+  const { data } = await apiFetchAuth<ProfileResponse>('/profile', token, {
     method: 'PATCH',
     body: JSON.stringify(body),
   });
-  return parseProfileResponse(data);
+  return data;
 }

@@ -1,6 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,8 +11,10 @@ import {
   View,
 } from "react-native";
 
-import type { Venue } from "@/api/venues";
+import { fetchVenues, type Venue } from "@/api/venues";
 import { AppColors } from "@/constants/app-colors";
+
+const SEARCH_DEBOUNCE_MS = 350;
 
 function venueLabel(v: Venue): string {
   const parts = [v.name, v.city, v.address].filter(Boolean);
@@ -19,7 +23,6 @@ function venueLabel(v: Venue): string {
 
 export type VenueSearchFieldProps = {
   label?: string;
-  venues: Venue[];
   value: Venue | null;
   onChange: (v: Venue | null) => void;
   onAddNewVenue: () => void;
@@ -28,27 +31,34 @@ export type VenueSearchFieldProps = {
 
 export function VenueSearchField({
   label = "Tournament location",
-  venues,
   value,
   onChange,
   onAddNewVenue,
   disabled = false,
 }: VenueSearchFieldProps) {
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [focused, setFocused] = useState(false);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return venues.slice(0, 8);
-    return venues.filter((v) => {
-      const hay = `${v.name} ${v.city ?? ""} ${v.address ?? ""}`.toLowerCase();
-      return hay.includes(q);
-    });
-  }, [venues, query]);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query.trim());
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const venuesQuery = useQuery({
+    queryKey: ["venues", debouncedQuery],
+    queryFn: () => fetchVenues(debouncedQuery),
+    enabled: debouncedQuery.length > 0,
+    staleTime: 30_000,
+  });
+
+  const venues = useMemo(() => venuesQuery.data ?? [], [venuesQuery.data]);
 
   const showList = focused && !disabled;
   const hasQuery = query.trim().length > 0;
-  const noMatches = hasQuery && filtered.length === 0;
+  const noMatches = hasQuery && debouncedQuery.length > 0 && !venuesQuery.isPending && venues.length === 0;
 
   return (
     <View style={styles.wrap}>
@@ -60,13 +70,14 @@ export function VenueSearchField({
             if (value) {
               onChange(null);
               setQuery(t);
+              setFocused(true);
             } else {
               setQuery(t);
             }
           }}
           onFocus={() => setFocused(true)}
           onBlur={() => {
-            setTimeout(() => setFocused(false), 320);
+            setTimeout(() => setFocused(false), SEARCH_DEBOUNCE_MS);
           }}
           placeholder="Search venues or add new…"
           placeholderTextColor={AppColors.placeholder}
@@ -79,6 +90,7 @@ export function VenueSearchField({
             onPress={() => {
               onChange(null);
               setQuery("");
+              setFocused(true);
             }}
             hitSlop={8}
             style={styles.clearBtn}
@@ -91,13 +103,21 @@ export function VenueSearchField({
 
       {showList ? (
         <View style={styles.listWrap}>
-          {filtered.length > 0 ? (
+          {venuesQuery.isPending && hasQuery ? (
+            <ActivityIndicator
+              size="small"
+              color={AppColors.primary}
+              style={styles.loader}
+            />
+          ) : null}
+
+          {!venuesQuery.isPending && venues.length > 0 ? (
             <ScrollView
               style={styles.list}
               keyboardShouldPersistTaps="handled"
               nestedScrollEnabled
             >
-              {filtered.map((item) => (
+              {venues.map((item) => (
                 <Pressable
                   key={item.id}
                   style={({ pressed }) => [
@@ -173,6 +193,9 @@ const styles = StyleSheet.create({
   clearBtn: {
     position: "absolute",
     right: 10,
+  },
+  loader: {
+    paddingVertical: 12,
   },
   listWrap: {
     marginTop: 6,

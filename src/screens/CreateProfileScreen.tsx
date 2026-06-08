@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { DatePickerField } from "@/components/tournament/date-picker-field";
 import { PrimaryButton } from "@/components/ui/primary-button";
 import { AppColors } from "@/constants/app-colors";
 import { useAuth, type ProfileCompletionPayload } from "@/contexts/auth-context";
@@ -40,7 +41,7 @@ export default function CreateProfileScreen() {
   const [fullName, setFullName] = useState(user?.name?.trim() ?? "");
   const [email, setEmail] = useState(user?.email?.trim() ?? "");
   const [gender, setGender] = useState<Gender | null>(normalizeGender(user?.gender));
-  const [dateOfBirth, setDateOfBirth] = useState(user?.dateOfBirth ?? "");
+  const [dateOfBirth, setDateOfBirth] = useState<string | null>(user?.dateOfBirth ?? null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -59,7 +60,7 @@ export default function CreateProfileScreen() {
         name: fullName.trim(),
         email: email.trim(),
         gender,
-        dateOfBirth: dateOfBirth.trim(),
+        dateOfBirth: dateOfBirth ?? "",
       });
     } catch (e) {
       const message =
@@ -87,7 +88,7 @@ export default function CreateProfileScreen() {
             accessibilityRole="button"
             accessibilityLabel="Go back"
           >
-            <Ionicons name="arrow-back" size={24} color="#1A3C40" />
+            <Ionicons name="arrow-back" size={24} color={AppColors.primaryDark} />
           </Pressable>
           <Text style={styles.headerTitle}>Create Profile</Text>
           <View style={styles.headerSpacer} />
@@ -182,13 +183,11 @@ export default function CreateProfileScreen() {
             autoCorrect={false}
           />
 
-          <Text style={styles.label}>Date of Birth</Text>
-          <TextInput
-            style={styles.input}
+          <DatePickerField
+            label="Date of Birth"
             value={dateOfBirth}
-            onChangeText={setDateOfBirth}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={AppColors.placeholder}
+            onChange={setDateOfBirth}
+            maximumDate={new Date()}
           />
 
           {saveError ? (
@@ -229,7 +228,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: 18,
     fontWeight: "700",
-    color: "#1A3C40",
+    color: AppColors.primaryDark,
   },
   headerSpacer: {
     width: 24,
@@ -270,7 +269,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#1A3C40",
+    color: AppColors.primaryDark,
     marginBottom: 8,
   },
   input: {
