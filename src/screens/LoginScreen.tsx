@@ -16,12 +16,9 @@ import { useAuth } from "@/contexts/auth-context";
 import { PHONE_DIGIT_LENGTH, PhoneInput } from "@/components/ui/phone-input";
 import { PrimaryButton } from "@/components/ui/primary-button";
 import { AppColors } from "@/constants/app-colors";
-import { ApiError } from "@/lib/api";
 
-function loginErrorMessage(err: unknown): string {
-  if (err instanceof ApiError) return err.message;
-  if (err instanceof Error) return err.message;
-  return "Something went wrong";
+function loginErrorMessage(err: Error): string {
+  return err.message;
 }
 
 export default function LoginScreen() {
@@ -40,7 +37,7 @@ export default function LoginScreen() {
     onMutate: () => {
       setLoginError(null);
     },
-    onError: (err: unknown) => {
+    onError: (err) => {
       setLoginError(loginErrorMessage(err));
     },
   });
@@ -59,7 +56,7 @@ export default function LoginScreen() {
       setOtpSheetOpen(false);
       setOtp("");
     },
-    onError: (err: unknown) => {
+    onError: (err) => {
       setVerifyError(loginErrorMessage(err));
     },
   });

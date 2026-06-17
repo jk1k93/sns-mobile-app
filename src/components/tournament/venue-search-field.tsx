@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -22,7 +23,7 @@ function venueLabel(v: Venue): string {
 }
 
 export type VenueSearchFieldProps = {
-  label?: string;
+  label?: ReactNode;
   value: Venue | null;
   onChange: (v: Venue | null) => void;
   onAddNewVenue: () => void;
@@ -81,7 +82,7 @@ export function VenueSearchField({
           }}
           placeholder="Search venues or add new…"
           placeholderTextColor={AppColors.placeholder}
-          style={styles.input}
+          style={[styles.input, disabled && styles.inputDisabled]}
           editable={!disabled}
           autoCorrect={false}
         />
@@ -189,6 +190,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: AppColors.textDark,
     backgroundColor: AppColors.white,
+  },
+  inputDisabled: {
+    backgroundColor: AppColors.surfaceMuted,
+    color: AppColors.textMuted,
   },
   clearBtn: {
     position: "absolute",

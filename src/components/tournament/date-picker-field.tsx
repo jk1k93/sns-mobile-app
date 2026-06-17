@@ -20,6 +20,7 @@ export type DatePickerFieldProps = {
   onChange: (iso: string | null) => void;
   minimumDate?: Date;
   maximumDate?: Date;
+  disabled?: boolean;
 };
 
 export function DatePickerField({
@@ -28,6 +29,7 @@ export function DatePickerField({
   onChange,
   minimumDate,
   maximumDate,
+  disabled = false,
 }: DatePickerFieldProps) {
   const [open, setOpen] = useState(false);
   const [temp, setTemp] = useState<Date>(() => {
@@ -62,9 +64,10 @@ export function DatePickerField({
           }}
           placeholder="YYYY-MM-DD"
           placeholderTextColor={AppColors.placeholder}
-          style={styles.input}
+          style={[styles.input, disabled && styles.rowDisabled]}
           autoCapitalize="none"
           autoCorrect={false}
+          editable={!disabled}
         />
       </View>
     );
@@ -74,10 +77,11 @@ export function DatePickerField({
     <View style={styles.wrap}>
       <Text style={styles.label}>{label}</Text>
       <Pressable
-        onPress={onOpen}
+        onPress={disabled ? undefined : onOpen}
         style={({ pressed }) => [
           styles.row,
-          pressed && styles.rowPressed,
+          disabled && styles.rowDisabled,
+          !disabled && pressed && styles.rowPressed,
         ]}
         accessibilityRole="button"
         accessibilityLabel={`${label}, ${display}`}
@@ -176,6 +180,9 @@ const styles = StyleSheet.create({
   },
   rowPressed: {
     opacity: 0.9,
+  },
+  rowDisabled: {
+    backgroundColor: AppColors.surfaceMuted,
   },
   rowText: {
     flex: 1,
