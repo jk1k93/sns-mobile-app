@@ -42,11 +42,14 @@ export default function TournamentDetailScreen() {
   const { accessToken } = useAuth();
   useHideTabBarWhileFocused();
 
-  const { data: tournament, isLoading, isError } = useQuery({
+  const { data: result, isLoading, isError } = useQuery({
     queryKey: ["tournament", id],
-    queryFn: () => fetchTournament(accessToken!, id),
+    queryFn: () => fetchTournament(id),
     enabled: !!accessToken && !!id,
   });
+
+  const tournament = result?.tournament;
+  const canUpdate = result?.canUpdate ?? false;
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -63,19 +66,23 @@ export default function TournamentDetailScreen() {
           <Text style={styles.headerTitle} numberOfLines={1}>
             {tournament?.name ?? "Tournament details"}
           </Text>
-          <Pressable
-            onPress={() =>
-              router.push({
-                pathname: "/tournaments/edit-details",
-                params: { tournamentId: id },
-              })
-            }
-            hitSlop={12}
-            accessibilityRole="button"
-            accessibilityLabel="Edit tournament"
-          >
-            <Ionicons name="pencil" size={20} color={AppColors.primary} />
-          </Pressable>
+          {canUpdate ? (
+            <Pressable
+              onPress={() =>
+                router.push({
+                  pathname: "/tournaments/edit-details",
+                  params: { tournamentId: id },
+                })
+              }
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Edit tournament"
+            >
+              <Ionicons name="pencil" size={20} color={AppColors.primary} />
+            </Pressable>
+          ) : (
+            <View style={styles.headerSpacer} />
+          )}
         </View>
 
         {isLoading && (
@@ -116,6 +123,52 @@ export default function TournamentDetailScreen() {
                 </View>
               </View>
             )}
+
+            {tournament.cricketConfig && (
+              <>
+                <Text style={styles.sectionTitle}>Cricket details</Text>
+                <DetailRow
+                  label="Ground type"
+                  value={tournament.cricketConfig.groundType === "BOX" ? "Box cricket" : "Open ground"}
+                />
+                <DetailRow
+                  label="Ball type"
+                  value={tournament.cricketConfig.ballType === "TENNIS" ? "Tennis ball" : "Leather ball"}
+                />
+                <DetailRow
+                  label="Number of teams"
+                  value={String(tournament.cricketConfig.numberOfTeams)}
+                />
+                <DetailRow
+                  label="Players per team"
+                  value={String(tournament.cricketConfig.playersPerTeam)}
+                />
+                <DetailRow
+                  label="Auction based"
+                  value={tournament.cricketConfig.auctionBased ? "Yes" : "No"}
+                />
+                {tournament.cricketConfig.auctionBased && (
+                  <>
+                    <DetailRow
+                      label="Purse per team"
+                      value={
+                        tournament.cricketConfig.auctionPurse != null
+                          ? String(tournament.cricketConfig.auctionPurse)
+                          : null
+                      }
+                    />
+                    <DetailRow
+                      label="Base price per player"
+                      value={
+                        tournament.cricketConfig.playerBasePrice != null
+                          ? String(tournament.cricketConfig.playerBasePrice)
+                          : null
+                      }
+                    />
+                  </>
+                )}
+              </>
+            )}
           </ScrollView>
         )}
       </ThemedView>
@@ -143,6 +196,9 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: AppColors.textDark,
     textAlign: "center",
+  },
+  headerSpacer: {
+    width: 20,
   },
   centered: {
     flex: 1,
@@ -177,5 +233,14 @@ const styles = StyleSheet.create({
   },
   contactList: {
     gap: 4,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: AppColors.primary,
+    marginTop: 20,
+    marginBottom: 4,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
 });

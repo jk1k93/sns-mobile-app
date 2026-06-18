@@ -56,8 +56,8 @@ type ProfileResponse = {
   };
 };
 
-export async function fetchProfile(token: string): Promise<ProfileFetchResult> {
-  const { data } = await apiFetchAuth<ProfileResponse>('/profile', token, { method: 'GET' });
+export async function fetchProfile(): Promise<ProfileFetchResult> {
+  const { data } = await apiFetchAuth<ProfileResponse>('/profile', { method: 'GET' });
   return data;
 }
 
@@ -141,11 +141,8 @@ export function buildProfilePatchBody(
   return body;
 }
 
-export async function saveProfile(
-  token: string,
-  body: PatchProfileBody
-): Promise<ProfileFetchResult> {
-  const { data } = await apiFetchAuth<ProfileResponse>('/profile', token, {
+export async function saveProfile(body: PatchProfileBody): Promise<ProfileFetchResult> {
+  const { data } = await apiFetchAuth<ProfileResponse>('/profile', {
     method: 'PATCH',
     body: JSON.stringify(body),
   });

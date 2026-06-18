@@ -76,11 +76,8 @@ export async function fetchVenues(q?: string): Promise<Venue[]> {
   return data.map(toVenue);
 }
 
-export async function createVenue(
-  token: string,
-  payload: CreateVenuePayload
-): Promise<Venue> {
-  const { data } = await apiFetchAuth<CreateVenueResponse>('/venues', token, {
+export async function createVenue(payload: CreateVenuePayload): Promise<Venue> {
+  const { data } = await apiFetchAuth<CreateVenueResponse>('/venues', {
     method: 'POST',
     body: JSON.stringify(payload),
   });

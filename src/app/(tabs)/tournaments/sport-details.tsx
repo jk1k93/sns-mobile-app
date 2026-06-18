@@ -17,7 +17,6 @@ import { fetchSports } from "@/api/sports";
 import { CricketConfigForm } from "@/components/tournament/cricket-config-form";
 import { ThemedView } from "@/components/themed-view";
 import { AppColors } from "@/constants/app-colors";
-import { useAuth } from "@/contexts/auth-context";
 import { useSelectedSport } from "@/contexts/selected-sport-context";
 import { useTournamentDraft } from "@/contexts/tournament-draft-context";
 import { useHideTabBarWhileFocused } from "@/hooks/use-hide-tab-bar";
@@ -27,7 +26,6 @@ export default function SportDetailsScreen() {
   const queryClient = useQueryClient();
   const { tournamentId, mode = "create", tournamentName } =
     useLocalSearchParams<{ tournamentId: string; mode?: string; tournamentName?: string }>();
-  const { accessToken } = useAuth();
   const { selectedSportId } = useSelectedSport();
   const draft = useTournamentDraft();
   useHideTabBarWhileFocused();
@@ -83,10 +81,9 @@ export default function SportDetailsScreen() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            {isCricket && accessToken && tournamentId ? (
+            {isCricket && tournamentId ? (
               <CricketConfigForm
                 tournamentId={tournamentId}
-                accessToken={accessToken}
                 onSave={onSave}
               />
             ) : (

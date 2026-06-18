@@ -20,7 +20,6 @@ import { CityAutocompleteField } from "@/components/tournament/city-autocomplete
 import { ThemedView } from "@/components/themed-view";
 import { PrimaryButton } from "@/components/ui/primary-button";
 import { AppColors } from "@/constants/app-colors";
-import { useAuth } from "@/contexts/auth-context";
 import { useTournamentDraft } from "@/contexts/tournament-draft-context";
 import { useHideTabBarWhileFocused } from "@/hooks/use-hide-tab-bar";
 import {
@@ -33,7 +32,6 @@ import { ApiError } from "@/lib/api";
 export default function AddVenueScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { accessToken } = useAuth();
   const { setVenue } = useTournamentDraft();
   useHideTabBarWhileFocused();
 
@@ -45,11 +43,10 @@ export default function AddVenueScreen() {
 
   const mutation = useMutation({
     mutationFn: async () => {
-      if (!accessToken) throw new Error("Not signed in");
       if (!selectedCity) {
         throw new Error("Select a city from suggestions before saving");
       }
-      return createVenue(accessToken, {
+      return createVenue({
         city: selectedCity,
         venue: {
           name: name.trim(),
@@ -76,7 +73,6 @@ export default function AddVenueScreen() {
   const canSave =
     name.trim().length > 0 &&
     city.trim().length > 0 &&
-    Boolean(accessToken) &&
     Boolean(selectedCity) &&
     !loadingCityDetails;
 

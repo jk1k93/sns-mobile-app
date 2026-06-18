@@ -47,11 +47,13 @@ export default function EditTournamentDetailsScreen() {
   const queryClient = useQueryClient();
   useHideTabBarWhileFocused();
 
-  const { data: tournament, isLoading, isError } = useQuery({
+  const { data: result, isLoading, isError } = useQuery({
     queryKey: ["tournament", tournamentId],
-    queryFn: () => fetchTournament(accessToken!, tournamentId),
+    queryFn: () => fetchTournament(tournamentId),
     enabled: !!accessToken && !!tournamentId,
   });
+
+  const tournament = result?.tournament;
 
   const [name, setName] = useState("");
   const [venue, setVenue] = useState<Venue | null>(null);
@@ -116,7 +118,7 @@ export default function EditTournamentDetailsScreen() {
   }, [name, venue, startDate, endDate, registrationStartDate, registrationEndDate]);
 
   const onContinue = async () => {
-    if (!canContinue || isSubmitting || !accessToken || !tournamentId || !venue) return;
+    if (!canContinue || isSubmitting || !tournamentId || !venue) return;
 
     const contactsPayload = contacts.map((c) =>
       c.userId ? { userId: c.userId } : { name: c.name, phone: c.phone }
@@ -135,7 +137,7 @@ export default function EditTournamentDetailsScreen() {
 
     setIsSubmitting(true);
     try {
-      await updateTournament(accessToken, tournamentId, payload);
+      await updateTournament(tournamentId, payload);
       queryClient.invalidateQueries({ queryKey: ["tournaments"] });
       queryClient.invalidateQueries({ queryKey: ["tournament", tournamentId] });
       router.push({

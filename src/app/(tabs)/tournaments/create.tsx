@@ -21,7 +21,6 @@ import { VenueSearchField } from "@/components/tournament/venue-search-field";
 import { ThemedView } from "@/components/themed-view";
 import { PrimaryButton } from "@/components/ui/primary-button";
 import { AppColors } from "@/constants/app-colors";
-import { useAuth } from "@/contexts/auth-context";
 import { useSelectedSport } from "@/contexts/selected-sport-context";
 import { useTournamentDraft } from "@/contexts/tournament-draft-context";
 import { useHideTabBarWhileFocused } from "@/hooks/use-hide-tab-bar";
@@ -40,7 +39,6 @@ function parseApiErrorMessage(body?: string): string | undefined {
 
 export default function TournamentCreateStep1Screen() {
   const router = useRouter();
-  const { accessToken } = useAuth();
   const { selectedSportId } = useSelectedSport();
   const draft = useTournamentDraft();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -79,10 +77,6 @@ export default function TournamentCreateStep1Screen() {
 
   const onContinue = async () => {
     if (!canContinue || isSubmitting) return;
-    if (!accessToken) {
-      Alert.alert("Error", "You must be signed in to create a tournament.");
-      return;
-    }
 
     const { name, venue, startDate, endDate, registrationStartDate, registrationEndDate, description, contacts } =
       draft.draft;
@@ -111,10 +105,10 @@ export default function TournamentCreateStep1Screen() {
       let id = tournamentId;
 
       if (!id) {
-        const tournament = await createTournament(accessToken, payload);
+        const tournament = await createTournament(payload);
         id = tournament.id;
       } else {
-        await updateTournament(accessToken, id, payload);
+        await updateTournament(id, payload);
       }
       draft.markSaved(id);
 

@@ -34,26 +34,22 @@ export type CreateCricketConfigPayload = {
 export type UpdateCricketConfigPayload = Partial<CreateCricketConfigPayload>;
 
 export async function createCricketConfig(
-  token: string,
   tournamentId: string,
   payload: CreateCricketConfigPayload
 ): Promise<CricketConfig> {
   const { data } = await apiFetchAuth<CricketConfigResponse>(
     `/tournaments/${tournamentId}/cricket-config`,
-    token,
     { method: 'POST', body: JSON.stringify(payload) }
   );
   return data;
 }
 
 export async function updateCricketConfig(
-  token: string,
   tournamentId: string,
   payload: UpdateCricketConfigPayload
 ): Promise<CricketConfig> {
   const { data } = await apiFetchAuth<CricketConfigResponse>(
     `/tournaments/${tournamentId}/cricket-config`,
-    token,
     { method: 'PATCH', body: JSON.stringify(payload) }
   );
   return data;

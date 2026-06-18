@@ -66,7 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        const profile = await fetchProfile(token);
+        const profile = await fetchProfile();
         if (cancelled) return;
 
         setAccessToken(token);
@@ -110,7 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Not signed in');
       }
       const body = buildProfilePatchBody(user, payload);
-      const profile = await saveProfile(accessToken, body);
+      const profile = await saveProfile(body);
       setUser(profile.user);
       setNeedsProfileCompletion(profile.newUser);
     },

@@ -5,22 +5,31 @@ import { useCallback } from "react";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { fetchTournaments, type TournamentListItem } from "@/api/tournaments";
+import { fetchTournaments, type TournamentDetail } from "@/api/tournaments";
+import type { GeoCoordinates } from "@/lib/types";
 import { TournamentCard } from "@/components/tournament/tournament-card";
 import { ThemedView } from "@/components/themed-view";
 import { AppColors } from "@/constants/app-colors";
 import { useAuth } from "@/contexts/auth-context";
+import { useUserLocation } from "@/contexts/location-context";
+import { useSelectedSport } from "@/contexts/selected-sport-context";
 import { useTournamentDraft } from "@/contexts/tournament-draft-context";
 
 export default function TournamentsListScreen() {
   const router = useRouter();
   const { reset } = useTournamentDraft();
   const { accessToken } = useAuth();
+  const { selectedSportId } = useSelectedSport();
+  const { location } = useUserLocation();
+
+  const coords: GeoCoordinates | undefined = location
+    ? { lat: location.coords.latitude, lng: location.coords.longitude }
+    : undefined;
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["tournaments"],
-    queryFn: () => fetchTournaments(accessToken!),
-    enabled: !!accessToken,
+    queryKey: ["tournaments", selectedSportId, coords?.lat ?? null, coords?.lng ?? null],
+    queryFn: () => fetchTournaments(selectedSportId!, coords),
+    enabled: !!accessToken && !!selectedSportId,
   });
 
   useFocusEffect(
@@ -38,7 +47,7 @@ export default function TournamentsListScreen() {
     router.push(`/tournaments/${id}`);
   };
 
-  const renderItem = ({ item }: { item: TournamentListItem }) => (
+  const renderItem = ({ item }: { item: TournamentDetail }) => (
     <TournamentCard tournament={item} onPress={() => goDetail(item.id)} />
   );
 

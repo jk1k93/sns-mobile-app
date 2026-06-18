@@ -36,15 +36,10 @@ function parseApiErrorMessage(body?: string): string | undefined {
 
 type CricketConfigFormProps = {
   tournamentId: string;
-  accessToken: string;
   onSave: () => void;
 };
 
-export function CricketConfigForm({
-  tournamentId,
-  accessToken,
-  onSave,
-}: CricketConfigFormProps) {
+export function CricketConfigForm({ tournamentId, onSave }: CricketConfigFormProps) {
   const [groundType, setGroundType] = useState<GroundType | null>(null);
   const [ballType, setBallType] = useState<BallType | null>(null);
   const [numberOfTeams, setNumberOfTeams] = useState("");
@@ -105,9 +100,9 @@ export function CricketConfigForm({
     setIsSubmitting(true);
     try {
       if (existingConfig) {
-        await updateCricketConfig(accessToken, tournamentId, payload);
+        await updateCricketConfig(tournamentId, payload);
       } else {
-        await createCricketConfig(accessToken, tournamentId, payload);
+        await createCricketConfig(tournamentId, payload);
       }
       onSave();
     } catch (e) {

@@ -1,3 +1,5 @@
+import { getAuthToken } from '@/lib/auth-token';
+
 const baseUrl = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8080';
 
 function joinUrl(path: string): string {
@@ -42,11 +44,11 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   return JSON.parse(text) as T;
 }
 
-export async function apiFetchAuth<T>(
-  path: string,
-  token: string,
-  init?: RequestInit
-): Promise<T> {
+export async function apiFetchAuth<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = await getAuthToken();
+  if (!token) {
+    throw new ApiError('Not authenticated', 401);
+  }
   return apiFetch<T>(path, {
     ...init,
     headers: {

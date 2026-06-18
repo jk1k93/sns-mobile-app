@@ -11,7 +11,6 @@ import {
 
 import { searchUserByPhone, type UserSummary } from "@/api/users";
 import { AppColors } from "@/constants/app-colors";
-import { useAuth } from "@/contexts/auth-context";
 import type { DraftContact } from "@/contexts/tournament-draft-context";
 
 const SEARCH_DEBOUNCE_MS = 500;
@@ -25,7 +24,6 @@ type ContactsFieldProps = {
 };
 
 export function ContactsField({ contacts, onAdd, onRemove }: ContactsFieldProps) {
-  const { accessToken } = useAuth();
   const [phone, setPhone] = useState("");
   const [nameInput, setNameInput] = useState("");
   const [status, setStatus] = useState<SearchStatus>("idle");
@@ -51,9 +49,9 @@ export function ContactsField({ contacts, onAdd, onRemove }: ContactsFieldProps)
     let cancelled = false;
 
     debounceRef.current = setTimeout(async () => {
-      if (!accessToken || cancelled) return;
+      if (cancelled) return;
       try {
-        const user = await searchUserByPhone(accessToken, trimmed);
+        const user = await searchUserByPhone(trimmed);
         if (!cancelled) {
           if (user) {
             setFoundUser(user);
@@ -75,7 +73,7 @@ export function ContactsField({ contacts, onAdd, onRemove }: ContactsFieldProps)
       cancelled = true;
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [phone, accessToken]);
+  }, [phone]);
 
   useEffect(() => {
     if (status !== "found" || !foundUser) return;
