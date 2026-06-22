@@ -1,21 +1,71 @@
-import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { fetchTournament, type TournamentDetail } from "@/api/tournaments";
+import { fetchPlayers, type TournamentPlayerDetail } from "@/api/players";
+import { deleteTournament, fetchTournament, type TeamSummary, type TournamentDetail } from "@/api/tournaments";
 import { ThemedView } from "@/components/themed-view";
 import { AppColors } from "@/constants/app-colors";
 import { useAuth } from "@/contexts/auth-context";
 import { useHideTabBarWhileFocused } from "@/hooks/use-hide-tab-bar";
+
+const SCROLL_PADDING = 20;
+const GRID_GAP = 10;
+const MIN_CARD_WIDTH = 140;
+
+function TeamCard({ team, onPress }: { team: TeamSummary; onPress: () => void }) {
+  const initials = team.name
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.teamCard, pressed && styles.teamCardPressed]}
+      accessibilityRole="button"
+      accessibilityLabel={`View ${team.name}`}
+    >
+      <View style={styles.teamAvatar}>
+        <Text style={styles.teamAvatarText}>{initials}</Text>
+      </View>
+      <Text style={styles.teamName} numberOfLines={2}>{team.name}</Text>
+    </Pressable>
+  );
+}
+
+function PlayerCard({ player }: { player: TournamentPlayerDetail }) {
+  const displayName = player.player.name ?? player.player.phoneNumber;
+  const initials = displayName
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+
+  return (
+    <View style={styles.playerCard}>
+      <View style={styles.playerAvatar}>
+        <Text style={styles.teamAvatarText}>{initials}</Text>
+      </View>
+      <Text style={styles.teamName} numberOfLines={2}>{displayName}</Text>
+    </View>
+  );
+}
 
 function DetailRow({ label, value }: { label: string; value: string | null | undefined }) {
   return (
@@ -39,8 +89,39 @@ function venueDisplay(tournament: TournamentDetail): string | null {
 export default function TournamentDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
+  const { width } = useWindowDimensions();
   useHideTabBarWhileFocused();
+
+  const contentWidth = width - SCROLL_PADDING * 2;
+  const numCols = Math.max(2, Math.floor((contentWidth + GRID_GAP) / (MIN_CARD_WIDTH + GRID_GAP)));
+  const cardWidth = (contentWidth - GRID_GAP * (numCols - 1)) / numCols;
+
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = () => {
+    Alert.alert(
+      "Delete tournament",
+      "Are you sure you want to delete this tournament? This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            setIsDeleting(true);
+            try {
+              await deleteTournament(id);
+              router.back();
+            } catch {
+              Alert.alert("Error", "Failed to delete tournament. Please try again.");
+              setIsDeleting(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const { data: result, isLoading, isError } = useQuery({
     queryKey: ["tournament", id],
@@ -48,8 +129,21 @@ export default function TournamentDetailScreen() {
     enabled: !!accessToken && !!id,
   });
 
+  const { data: players = [] } = useQuery({
+    queryKey: ["tournament-players", id],
+    queryFn: () => fetchPlayers(id),
+    enabled: !!id,
+  });
+
   const tournament = result?.tournament;
   const canUpdate = result?.canUpdate ?? false;
+  const canManage =
+    !!tournament &&
+    !!user &&
+    (tournament.organiserId === user.id ||
+      tournament.contacts.some((c) => c.userId === user.id));
+  const alreadyRegistered = !!user && players.some((p) => p.playerId === user.id);
+  const canSelfRegister = !!tournament && !!user && !canManage && !alreadyRegistered;
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -67,19 +161,30 @@ export default function TournamentDetailScreen() {
             {tournament?.name ?? "Tournament details"}
           </Text>
           {canUpdate ? (
-            <Pressable
-              onPress={() =>
-                router.push({
-                  pathname: "/tournaments/edit-details",
-                  params: { tournamentId: id },
-                })
-              }
-              hitSlop={12}
-              accessibilityRole="button"
-              accessibilityLabel="Edit tournament"
-            >
-              <Ionicons name="pencil" size={20} color={AppColors.primary} />
-            </Pressable>
+            <View style={styles.headerActions}>
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: "/tournaments/edit-details",
+                    params: { tournamentId: id },
+                  })
+                }
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel="Edit tournament"
+              >
+                <Ionicons name="pencil" size={20} color={AppColors.primary} />
+              </Pressable>
+              <Pressable
+                onPress={handleDelete}
+                disabled={isDeleting}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel="Delete tournament"
+              >
+                <Ionicons name="trash-outline" size={20} color={AppColors.error} />
+              </Pressable>
+            </View>
           ) : (
             <View style={styles.headerSpacer} />
           )}
@@ -107,8 +212,6 @@ export default function TournamentDetailScreen() {
             <DetailRow label="Venue" value={venueDisplay(tournament)} />
             <DetailRow label="Tournament start" value={tournament.tournamentStartDate} />
             <DetailRow label="Tournament end" value={tournament.tournamentEndDate} />
-            <DetailRow label="Registration start" value={tournament.registrationStartDate} />
-            <DetailRow label="Registration end" value={tournament.registrationEndDate} />
             <DetailRow label="Description" value={tournament.description} />
 
             {tournament.contacts.length > 0 && (
@@ -124,7 +227,113 @@ export default function TournamentDetailScreen() {
               </View>
             )}
 
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Teams</Text>
+              {canManage && (
+                <Pressable
+                  onPress={() =>
+                    router.push({
+                      pathname: "/tournaments/add-team",
+                      params: { tournamentId: id },
+                    })
+                  }
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Add team"
+                >
+                  <Ionicons name="add-circle-outline" size={24} color={AppColors.primary} />
+                </Pressable>
+              )}
+            </View>
+
+            {tournament.teams.length === 0 ? (
+              <Text style={styles.sectionEmpty}>No teams yet.</Text>
+            ) : (
+              <View style={styles.grid}>
+                {tournament.teams.map((team) => (
+                  <View key={team.id} style={{ width: cardWidth }}>
+                    <TeamCard
+                      team={team}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/tournaments/team-details",
+                          params: { tournamentId: id, teamId: team.id, canManage: canManage ? "1" : "0" },
+                        })
+                      }
+                    />
+                  </View>
+                ))}
+              </View>
+            )}
+
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Players</Text>
+              {canManage && (
+                <Pressable
+                  onPress={() =>
+                    router.push({
+                      pathname: "/tournaments/add-player",
+                      params: { tournamentId: id, sportId: tournament.sportId },
+                    })
+                  }
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Add player"
+                >
+                  <Ionicons name="add-circle-outline" size={24} color={AppColors.primary} />
+                </Pressable>
+              )}
+            </View>
+
+            {players.length === 0 ? (
+              <Text style={styles.sectionEmpty}>No players yet.</Text>
+            ) : (
+              <>
+                <View style={styles.grid}>
+                  {players.slice(0, 4).map((player) => (
+                    <View key={player.id} style={{ width: cardWidth }}>
+                      <PlayerCard player={player} />
+                    </View>
+                  ))}
+                </View>
+                <Pressable
+                  onPress={() =>
+                    router.push({
+                      pathname: "/tournaments/players",
+                      params: { tournamentId: id, canManage: canManage ? "1" : "0" },
+                    })
+                  }
+                  style={styles.showAllBtn}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.showAllText}>
+                    {players.length > 4
+                      ? `Show all ${players.length} players`
+                      : "See players list"}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={16} color={AppColors.primary} />
+                </Pressable>
+              </>
+            )}
           </ScrollView>
+        )}
+
+        {canSelfRegister && (
+          <View style={styles.registerFooter}>
+            <Pressable
+              onPress={() =>
+                router.push({
+                  pathname: "/tournaments/register-player",
+                  params: { tournamentId: id, sportId: tournament!.sportId },
+                })
+              }
+              style={({ pressed }) => [styles.registerBtn, pressed && styles.registerBtnPressed]}
+              accessibilityRole="button"
+            >
+              <Ionicons name="person-add-outline" size={18} color={AppColors.white} />
+              <Text style={styles.registerBtnText}>Register as player</Text>
+            </Pressable>
+          </View>
         )}
       </ThemedView>
     </SafeAreaView>
@@ -154,6 +363,11 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     width: 20,
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
   },
   centered: {
     flex: 1,
@@ -188,5 +402,107 @@ const styles = StyleSheet.create({
   },
   contactList: {
     gap: 4,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 24,
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: AppColors.textDark,
+  },
+  sectionEmpty: {
+    fontSize: 14,
+    color: AppColors.textMuted,
+  },
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: GRID_GAP,
+  },
+  teamCard: {
+    backgroundColor: AppColors.surfaceMuted,
+    borderRadius: 12,
+    padding: 12,
+    alignItems: "center",
+    gap: 8,
+  },
+  playerCard: {
+    borderRadius: 12,
+    padding: 12,
+    alignItems: "center",
+    gap: 8,
+  },
+  teamCardPressed: {
+    opacity: 0.7,
+  },
+  teamAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: AppColors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  playerAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: AppColors.primaryDark,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  teamAvatarText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: AppColors.white,
+  },
+  teamName: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: AppColors.textDark,
+    textAlign: "center",
+  },
+  showAllBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    marginTop: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: AppColors.surfaceMuted,
+  },
+  showAllText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: AppColors.primary,
+  },
+  registerFooter: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "#E0E0E0",
+  },
+  registerBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: AppColors.primary,
+    borderRadius: 12,
+    paddingVertical: 14,
+  },
+  registerBtnPressed: {
+    opacity: 0.85,
+  },
+  registerBtnText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: AppColors.white,
   },
 });

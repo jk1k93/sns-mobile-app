@@ -87,6 +87,20 @@ export type TournamentSport = {
   updatedAt: string;
 };
 
+export type TeamSummary = {
+  id: string;
+  tournamentId: string;
+  name: string;
+  shortCode: string | null;
+  logoUrl: string | null;
+  captainId: string | null;
+  viceCaptainId: string | null;
+  ownerId: string;
+  isDeleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type TournamentDetail = TournamentListItem & {
   organiserId: string;
   registrationStartDate: string | null;
@@ -98,6 +112,7 @@ export type TournamentDetail = TournamentListItem & {
   sport: TournamentSport;
   contacts: TournamentContactDetail[];
   cricketConfig: CricketConfig | null;
+  teams: TeamSummary[];
 };
 
 export type TournamentFetchResult = {
@@ -166,4 +181,8 @@ export async function updateTournament(id: string, payload: UpdateTournamentPayl
     body: JSON.stringify(payload),
   });
   return data;
+}
+
+export async function deleteTournament(id: string): Promise<void> {
+  await apiFetchAuth<{ message: string }>(`/tournaments/${id}`, { method: 'DELETE' });
 }
