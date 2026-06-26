@@ -18,6 +18,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { deletePlayer, fetchPlayers, type TournamentPlayerDetail } from "@/api/players";
 import { ThemedView } from "@/components/themed-view";
 import { AppColors } from "@/constants/app-colors";
+import { useAuth } from "@/contexts/auth-context";
 import { useHideTabBarWhileFocused } from "@/hooks/use-hide-tab-bar";
 
 function PlayerRow({
@@ -79,13 +80,14 @@ export default function PlayersScreen() {
   useHideTabBarWhileFocused();
 
   const canManage = canManageParam === "1";
+  const { accessToken } = useAuth();
   const [search, setSearch] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const { data: players = [], isLoading, isError, refetch } = useQuery({
     queryKey: ["tournament-players", tournamentId],
     queryFn: () => fetchPlayers(tournamentId),
-    enabled: !!tournamentId,
+    enabled: !!accessToken && !!tournamentId,
   });
 
   const filtered = useMemo(() => {

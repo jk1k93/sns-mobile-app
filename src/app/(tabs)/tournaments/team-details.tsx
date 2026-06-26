@@ -139,7 +139,10 @@ export default function TeamDetailsScreen() {
               label="Vice-captain"
               value={team.viceCaptain ? personDisplay(team.viceCaptain) : null}
             />
-            <DetailRow label="Owner" value={personDisplay(team.owner)} />
+            <DetailRow
+              label="Owner"
+              value={team.owner ? personDisplay(team.owner) : null}
+            />
           </ScrollView>
         )}
       </ThemedView>

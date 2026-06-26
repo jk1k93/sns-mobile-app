@@ -47,7 +47,7 @@ export function SelectedSportProvider({ children }: { children: React.ReactNode 
       }
 
       setIsSportPreferenceReady(false);
-      const id = await getSelectedSportId();
+      const id = await getSelectedSportId(user.id);
       if (!cancelled) {
         setSelectedSportId(id);
         setIsSportPreferenceReady(true);
@@ -62,9 +62,10 @@ export function SelectedSportProvider({ children }: { children: React.ReactNode 
   }, [user]);
 
   const selectSport = useCallback(async (id: string) => {
-    await persistSportIdToStorage(id);
+    if (!user) return;
+    await persistSportIdToStorage(user.id, id);
     setSelectedSportId(id);
-  }, []);
+  }, [user]);
 
   const value = useMemo(
     () => ({

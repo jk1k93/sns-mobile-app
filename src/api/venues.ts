@@ -1,4 +1,4 @@
-import { apiFetch, apiFetchAuth } from '@/lib/api';
+import { apiFetchAuth } from '@/lib/api';
 
 type City = {
   id: string;
@@ -72,7 +72,7 @@ export async function fetchVenues(q?: string): Promise<Venue[]> {
   const path = query
     ? `/venues/search?q=${encodeURIComponent(query)}`
     : '/venues/search';
-  const { data } = await apiFetch<SearchVenuesResponse>(path, { method: 'GET' });
+  const { data } = await apiFetchAuth<SearchVenuesResponse>(path, { method: 'GET' });
   return data.map(toVenue);
 }
 

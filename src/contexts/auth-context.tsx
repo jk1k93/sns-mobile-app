@@ -17,7 +17,6 @@ import {
 } from '@/api/auth';
 import { AppColors } from '@/constants/app-colors';
 import { deleteAuthToken, getAuthToken, setAuthToken } from '@/lib/auth-token';
-import { clearSelectedSportId } from '@/lib/selected-sport-id';
 
 export type { ProfileCompletionPayload } from '@/api/auth';
 
@@ -74,7 +73,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setNeedsProfileCompletion(profile.newUser);
       } catch {
         await deleteAuthToken();
-        await clearSelectedSportId();
         if (!cancelled) {
           setUser(null);
           setAccessToken(null);
@@ -119,7 +117,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     await deleteAuthToken();
-    await clearSelectedSportId();
     setAccessToken(null);
     setUser(null);
     setNeedsProfileCompletion(false);

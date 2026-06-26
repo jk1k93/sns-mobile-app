@@ -23,7 +23,7 @@ export type TeamDetail = {
   updatedAt: string;
   captain: TeamUserSummary | null;
   viceCaptain: TeamUserSummary | null;
-  owner: TeamUserSummary;
+  owner: TeamUserSummary | null;
 };
 
 export type CreateTeamPayload = {

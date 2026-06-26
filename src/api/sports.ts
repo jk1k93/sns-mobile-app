@@ -1,4 +1,4 @@
-import { apiFetch } from '@/lib/api';
+import { apiFetchAuth } from '@/lib/api';
 
 export type Sport = {
   id: string;
@@ -14,6 +14,6 @@ type ListSportsResponse = {
 };
 
 export async function fetchSports(): Promise<Sport[]> {
-  const { data } = await apiFetch<ListSportsResponse>('/sports', { method: 'GET' });
+  const { data } = await apiFetchAuth<ListSportsResponse>('/sports', { method: 'GET' });
   return data;
 }

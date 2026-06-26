@@ -1,4 +1,4 @@
-import { apiFetch, apiFetchAuth } from '@/lib/api';
+import { apiFetchAuth } from '@/lib/api';
 
 export type JerseySize = 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL' | 'XXXL';
 
@@ -34,7 +34,7 @@ export type CreatePlayerPayload = {
 };
 
 export async function fetchPlayers(tournamentId: string): Promise<TournamentPlayerDetail[]> {
-  const { data } = await apiFetch<{ message: string; data: TournamentPlayerDetail[] }>(
+  const { data } = await apiFetchAuth<{ message: string; data: TournamentPlayerDetail[] }>(
     `/tournaments/${tournamentId}/players`,
     { method: 'GET' }
   );

@@ -1,4 +1,4 @@
-import { apiFetch } from '@/lib/api';
+import { apiFetchAuth } from '@/lib/api';
 
 export type CricketRole = {
   id: string;
@@ -10,7 +10,7 @@ export type CricketRole = {
 
 export async function fetchCricketRoles(activeOnly = true): Promise<CricketRole[]> {
   const params = new URLSearchParams(activeOnly ? { activeOnly: 'true' } : {});
-  const { data } = await apiFetch<{ message: string; data: CricketRole[] }>(
+  const { data } = await apiFetchAuth<{ message: string; data: CricketRole[] }>(
     `/cricket-roles?${params.toString()}`,
     { method: 'GET' }
   );

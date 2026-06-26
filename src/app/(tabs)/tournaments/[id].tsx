@@ -132,7 +132,7 @@ export default function TournamentDetailScreen() {
   const { data: players = [] } = useQuery({
     queryKey: ["tournament-players", id],
     queryFn: () => fetchPlayers(id),
-    enabled: !!id,
+    enabled: !!accessToken && !!id,
   });
 
   const tournament = result?.tournament;

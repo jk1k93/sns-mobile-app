@@ -1,4 +1,4 @@
-import { apiFetch, apiFetchAuth, ApiError } from '@/lib/api';
+import { apiFetchAuth, ApiError } from '@/lib/api';
 import type { GroundType, BallType } from '@/contexts/tournament-draft-context';
 
 export type CricketConfig = {
@@ -57,7 +57,7 @@ export async function updateCricketConfig(
 
 export async function getCricketConfig(tournamentId: string): Promise<CricketConfig | null> {
   try {
-    const { data } = await apiFetch<CricketConfigResponse>(
+    const { data } = await apiFetchAuth<CricketConfigResponse>(
       `/tournaments/${tournamentId}/cricket-config`,
       { method: 'GET' }
     );
