@@ -1,6 +1,6 @@
+import type { CricketConfig } from '@/api/cricket-config';
 import { apiFetchAuth } from '@/lib/api';
 import type { GeoCoordinates } from '@/lib/types';
-import type { CricketConfig } from '@/api/cricket-config';
 
 export type TournamentStatus = 'DRAFT' | 'PUBLISHED' | 'CANCELLED' | 'ARCHIVED';
 
@@ -111,7 +111,7 @@ export type TournamentDetail = TournamentListItem & {
   organiser: TournamentOrganiser;
   sport: TournamentSport;
   contacts: TournamentContactDetail[];
-  cricketConfig: CricketConfig | null;
+  cricketTournamentConfig: CricketConfig | null;
   teams: TeamSummary[];
 };
 

@@ -1,12 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { fetchSports } from "@/api/sports";
 import { fetchTournaments, type TournamentDetail } from "@/api/tournaments";
 import type { GeoCoordinates } from "@/lib/types";
+import { SportPickerSheet } from "@/components/sport-picker-sheet";
 import { TournamentCard } from "@/components/tournament/tournament-card";
 import { ThemedView } from "@/components/themed-view";
 import { AppColors } from "@/constants/app-colors";
@@ -20,11 +22,23 @@ export default function TournamentsListScreen() {
   const { reset } = useTournamentDraft();
   const { accessToken } = useAuth();
   const { selectedSportId } = useSelectedSport();
+  const [sportPickerVisible, setSportPickerVisible] = useState(false);
   const { location } = useUserLocation();
 
   const coords: GeoCoordinates | undefined = location
     ? { lat: location.coords.latitude, lng: location.coords.longitude }
     : undefined;
+
+  const { data: sports = [] } = useQuery({
+    queryKey: ["sports"],
+    queryFn: fetchSports,
+    enabled: !!accessToken,
+  });
+
+  const selectedSportName = useMemo(
+    () => sports.find((s) => s.id === selectedSportId)?.name ?? null,
+    [sports, selectedSportId]
+  );
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["tournaments", selectedSportId, coords?.lat ?? null, coords?.lng ?? null],
@@ -55,7 +69,21 @@ export default function TournamentsListScreen() {
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <ThemedView style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.title}>Tournaments</Text>
+          <View>
+            <Text style={styles.title}>Tournaments</Text>
+            {selectedSportName && (
+              <Pressable
+                onPress={() => setSportPickerVisible(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Switch sport"
+                hitSlop={8}
+                style={styles.sportChipRow}
+              >
+                <Text style={styles.sportChip}>{selectedSportName}</Text>
+                <Ionicons name="chevron-down" size={12} color={AppColors.primary} />
+              </Pressable>
+            )}
+          </View>
           <Pressable
             onPress={goCreate}
             style={({ pressed }) => [styles.createBtn, pressed && styles.createBtnPressed]}
@@ -63,9 +91,14 @@ export default function TournamentsListScreen() {
             accessibilityLabel="Create tournament"
             hitSlop={8}
           >
-            <Ionicons name="add" size={26} color={AppColors.primary} />
+            <Ionicons name="add" size={20} color={AppColors.primary} />
           </Pressable>
         </View>
+
+        <SportPickerSheet
+          visible={sportPickerVisible}
+          onClose={() => setSportPickerVisible(false)}
+        />
 
         {isLoading && (
           <ActivityIndicator
@@ -121,10 +154,23 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: AppColors.primary,
   },
+  sportChipRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    marginTop: 2,
+  },
+  sportChip: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: AppColors.primary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
   createBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: AppColors.surfaceMuted,
     borderWidth: 1,
     borderColor: "#C8E6D9",

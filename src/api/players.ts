@@ -33,6 +33,12 @@ export type CreatePlayerPayload = {
   jerseySize?: JerseySize;
 };
 
+export type UpdatePlayerPayload = {
+  roleId?: string | null;
+  jerseyNumber?: number | null;
+  jerseySize?: JerseySize | null;
+};
+
 export async function fetchPlayers(tournamentId: string): Promise<TournamentPlayerDetail[]> {
   const { data } = await apiFetchAuth<{ message: string; data: TournamentPlayerDetail[] }>(
     `/tournaments/${tournamentId}/players`,
@@ -45,6 +51,18 @@ export async function createPlayer(tournamentId: string, payload: CreatePlayerPa
   const { data } = await apiFetchAuth<{ message: string; data: TournamentPlayerDetail }>(
     `/tournaments/${tournamentId}/players`,
     { method: 'POST', body: JSON.stringify(payload) }
+  );
+  return data;
+}
+
+export async function updatePlayer(
+  tournamentId: string,
+  tournamentPlayerId: string,
+  payload: UpdatePlayerPayload
+): Promise<TournamentPlayerDetail> {
+  const { data } = await apiFetchAuth<{ message: string; data: TournamentPlayerDetail }>(
+    `/tournaments/${tournamentId}/players/${tournamentPlayerId}`,
+    { method: 'PATCH', body: JSON.stringify(payload) }
   );
   return data;
 }

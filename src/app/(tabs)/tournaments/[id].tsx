@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -17,6 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { fetchPlayers, type TournamentPlayerDetail } from "@/api/players";
 import { deleteTournament, fetchTournament, type TeamSummary, type TournamentDetail } from "@/api/tournaments";
 import { ThemedView } from "@/components/themed-view";
+import { SportConfigDisplay } from "@/components/tournament/sport-config-display";
 import { AppColors } from "@/constants/app-colors";
 import { useAuth } from "@/contexts/auth-context";
 import { useHideTabBarWhileFocused } from "@/hooks/use-hide-tab-bar";
@@ -48,7 +49,13 @@ function TeamCard({ team, onPress }: { team: TeamSummary; onPress: () => void })
   );
 }
 
-function PlayerCard({ player }: { player: TournamentPlayerDetail }) {
+function PlayerCard({
+  player,
+  onPress,
+}: {
+  player: TournamentPlayerDetail;
+  onPress?: () => void;
+}) {
   const displayName = player.player.name ?? player.player.phoneNumber;
   const initials = displayName
     .split(" ")
@@ -57,14 +64,29 @@ function PlayerCard({ player }: { player: TournamentPlayerDetail }) {
     .join("")
     .toUpperCase();
 
-  return (
-    <View style={styles.playerCard}>
+  const inner = (
+    <>
       <View style={styles.playerAvatar}>
         <Text style={styles.teamAvatarText}>{initials}</Text>
       </View>
       <Text style={styles.teamName} numberOfLines={2}>{displayName}</Text>
-    </View>
+    </>
   );
+
+  if (onPress) {
+    return (
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [styles.playerCard, pressed && styles.teamCardPressed]}
+        accessibilityRole="button"
+        accessibilityLabel={`Edit ${displayName}`}
+      >
+        {inner}
+      </Pressable>
+    );
+  }
+
+  return <View style={styles.playerCard}>{inner}</View>;
 }
 
 function DetailRow({ label, value }: { label: string; value: string | null | undefined }) {
@@ -227,6 +249,8 @@ export default function TournamentDetailScreen() {
               </View>
             )}
 
+            <SportConfigDisplay tournament={tournament} />
+
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Teams</Text>
               {canManage && (
@@ -290,17 +314,34 @@ export default function TournamentDetailScreen() {
             ) : (
               <>
                 <View style={styles.grid}>
-                  {players.slice(0, 4).map((player) => (
-                    <View key={player.id} style={{ width: cardWidth }}>
-                      <PlayerCard player={player} />
-                    </View>
-                  ))}
+                  {players.slice(0, 4).map((player) => {
+                    const canEdit = canManage || player.playerId === user?.id;
+                    return (
+                      <View key={player.id} style={{ width: cardWidth }}>
+                        <PlayerCard
+                          player={player}
+                          onPress={canEdit ? () => router.push({
+                            pathname: "/tournaments/edit-player",
+                            params: {
+                              tournamentId: id,
+                              tournamentPlayerId: player.id,
+                              sportId: tournament.sportId,
+                              currentRoleId: player.roleId ?? undefined,
+                              currentJerseyNumber: player.jerseyNumber != null ? String(player.jerseyNumber) : undefined,
+                              currentJerseySize: player.jerseySize ?? undefined,
+                              playerName: player.player.name ?? player.player.phoneNumber,
+                            },
+                          }) : undefined}
+                        />
+                      </View>
+                    );
+                  })}
                 </View>
                 <Pressable
                   onPress={() =>
                     router.push({
                       pathname: "/tournaments/players",
-                      params: { tournamentId: id, canManage: canManage ? "1" : "0" },
+                      params: { tournamentId: id, canManage: canManage ? "1" : "0", sportId: tournament.sportId },
                     })
                   }
                   style={styles.showAllBtn}

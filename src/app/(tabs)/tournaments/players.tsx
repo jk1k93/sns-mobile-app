@@ -24,10 +24,14 @@ import { useHideTabBarWhileFocused } from "@/hooks/use-hide-tab-bar";
 function PlayerRow({
   player,
   canManage,
+  canEdit,
+  onPress,
   onDelete,
 }: {
   player: TournamentPlayerDetail;
   canManage: boolean;
+  canEdit: boolean;
+  onPress: () => void;
   onDelete: () => void;
 }) {
   const displayName = player.player.name ?? player.player.phoneNumber;
@@ -45,7 +49,12 @@ function PlayerRow({
   if (player.team) meta.push(player.team.name);
 
   return (
-    <View style={styles.row}>
+    <Pressable
+      onPress={canEdit ? onPress : undefined}
+      style={({ pressed }) => [styles.row, canEdit && pressed && styles.rowPressed]}
+      accessibilityRole={canEdit ? "button" : "none"}
+      accessibilityLabel={canEdit ? `Edit ${displayName}` : undefined}
+    >
       <View style={styles.avatar}>
         <Text style={styles.avatarText}>{initials}</Text>
       </View>
@@ -66,21 +75,22 @@ function PlayerRow({
           <Ionicons name="trash-outline" size={20} color={AppColors.error} />
         </Pressable>
       )}
-    </View>
+    </Pressable>
   );
 }
 
 export default function PlayersScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { tournamentId, canManage: canManageParam } = useLocalSearchParams<{
+  const { tournamentId, canManage: canManageParam, sportId } = useLocalSearchParams<{
     tournamentId: string;
     canManage?: string;
+    sportId?: string;
   }>();
   useHideTabBarWhileFocused();
 
   const canManage = canManageParam === "1";
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
   const [search, setSearch] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -186,6 +196,21 @@ export default function PlayersScreen() {
               <PlayerRow
                 player={item}
                 canManage={canManage && deletingId !== item.id}
+                canEdit={canManage || item.playerId === user?.id}
+                onPress={() =>
+                  router.push({
+                    pathname: "/tournaments/edit-player",
+                    params: {
+                      tournamentId,
+                      tournamentPlayerId: item.id,
+                      sportId,
+                      currentRoleId: item.roleId ?? undefined,
+                      currentJerseyNumber: item.jerseyNumber != null ? String(item.jerseyNumber) : undefined,
+                      currentJerseySize: item.jerseySize ?? undefined,
+                      playerName: item.player.name ?? item.player.phoneNumber,
+                    },
+                  })
+                }
                 onDelete={() => handleDelete(item)}
               />
             )}
@@ -252,6 +277,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
     gap: 12,
+  },
+  rowPressed: {
+    opacity: 0.6,
   },
   avatar: {
     width: 44,

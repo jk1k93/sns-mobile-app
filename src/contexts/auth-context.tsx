@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import React, {
   createContext,
   useCallback,
@@ -44,6 +45,7 @@ export function useAuth(): AuthContextValue {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [needsProfileCompletion, setNeedsProfileCompletion] = useState(false);
@@ -117,10 +119,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     await deleteAuthToken();
+    queryClient.clear();
     setAccessToken(null);
     setUser(null);
     setNeedsProfileCompletion(false);
-  }, []);
+  }, [queryClient]);
 
   const value = useMemo(
     () => ({
