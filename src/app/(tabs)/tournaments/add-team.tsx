@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { createTeam } from "@/api/teams";
 import { SinglePersonField, type SelectedPerson } from "@/components/team/single-person-field";
@@ -52,12 +52,26 @@ export default function AddTeamScreen() {
   const [partialCaptainPhone, setPartialCaptainPhone] = useState(false);
   const [partialViceCaptainPhone, setPartialViceCaptainPhone] = useState(false);
   const [partialOwnerPhone, setPartialOwnerPhone] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const createMutation = useMutation({
+    mutationFn: (payload: Parameters<typeof createTeam>[1]) =>
+      createTeam(tournamentId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tournament", tournamentId] });
+      router.back();
+    },
+    onError: (e) => {
+      const message =
+        e instanceof ApiError
+          ? (parseApiErrorMessage(e.body) ?? e.message)
+          : "Something went wrong. Please try again.";
+      Alert.alert("Failed to create team", message);
+    },
+  });
 
   const hasPartialPhone = partialCaptainPhone || partialViceCaptainPhone || partialOwnerPhone;
-  const canSubmit = name.trim().length > 0 && !hasPartialPhone && !isSubmitting;
+  const canSubmit = name.trim().length > 0 && !hasPartialPhone && !createMutation.isPending;
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!canSubmit || !tournamentId) return;
 
     const trimmedShortCode = shortCode.trim();
@@ -66,34 +80,21 @@ export default function AddTeamScreen() {
       return;
     }
 
-    setIsSubmitting(true);
-    try {
-      const toUserRef = (p: SelectedPerson) =>
-        p.userId ?? { name: p.name, phone: p.phone };
+    const toUserRef = (p: SelectedPerson) =>
+      p.userId ? p.userId : { name: p.name, phone: p.phone };
 
-      const effectiveCaptain = captain ?? pendingCaptain;
-      const effectiveViceCaptain = viceCaptain ?? pendingViceCaptain;
-      const effectiveOwner = owner ?? pendingOwner;
+    const effectiveCaptain = captain ?? pendingCaptain;
+    const effectiveViceCaptain = viceCaptain ?? pendingViceCaptain;
+    const effectiveOwner = owner ?? pendingOwner;
 
-      await createTeam(tournamentId, {
-        name: name.trim(),
-        ...(trimmedShortCode ? { shortCode: trimmedShortCode } : {}),
-        ...(logoUrl.trim() ? { logoUrl: logoUrl.trim() } : {}),
-        ...(effectiveCaptain ? { captain: toUserRef(effectiveCaptain) } : {}),
-        ...(effectiveViceCaptain ? { viceCaptain: toUserRef(effectiveViceCaptain) } : {}),
-        ...(effectiveOwner ? { owner: toUserRef(effectiveOwner) } : {}),
-      });
-      await queryClient.invalidateQueries({ queryKey: ["tournament", tournamentId] });
-      router.back();
-    } catch (e) {
-      const message =
-        e instanceof ApiError
-          ? (parseApiErrorMessage(e.body) ?? e.message)
-          : "Something went wrong. Please try again.";
-      Alert.alert("Failed to create team", message);
-    } finally {
-      setIsSubmitting(false);
-    }
+    createMutation.mutate({
+      name: name.trim(),
+      ...(trimmedShortCode ? { shortCode: trimmedShortCode } : {}),
+      ...(logoUrl.trim() ? { logoUrl: logoUrl.trim() } : {}),
+      ...(effectiveCaptain ? { captain: toUserRef(effectiveCaptain) } : {}),
+      ...(effectiveViceCaptain ? { viceCaptain: toUserRef(effectiveViceCaptain) } : {}),
+      ...(effectiveOwner ? { owner: toUserRef(effectiveOwner) } : {}),
+    });
   };
 
   return (
@@ -185,7 +186,7 @@ export default function AddTeamScreen() {
             />
 
             <PrimaryButton
-              title={isSubmitting ? "Saving…" : "Save"}
+              title={createMutation.isPending ? "Saving…" : "Save"}
               onPress={handleSubmit}
               disabled={!canSubmit}
               style={styles.submitBtn}

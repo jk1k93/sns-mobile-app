@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -16,6 +16,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { fetchPlayers, type TournamentPlayerDetail } from "@/api/players";
 import { deleteTournament, fetchTournament, type TeamSummary, type TournamentDetail } from "@/api/tournaments";
+import { ConfirmationModal } from "@/components/confirmation-modal";
 import { ThemedView } from "@/components/themed-view";
 import { SportConfigDisplay } from "@/components/tournament/sport-config-display";
 import { AppColors } from "@/constants/app-colors";
@@ -119,31 +120,19 @@ export default function TournamentDetailScreen() {
   const numCols = Math.max(2, Math.floor((contentWidth + GRID_GAP) / (MIN_CARD_WIDTH + GRID_GAP)));
   const cardWidth = (contentWidth - GRID_GAP * (numCols - 1)) / numCols;
 
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [sportDetailsExpanded, setSportDetailsExpanded] = useState(false);
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
 
-  const handleDelete = () => {
-    Alert.alert(
-      "Delete tournament",
-      "Are you sure you want to delete this tournament? This cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            setIsDeleting(true);
-            try {
-              await deleteTournament(id);
-              router.back();
-            } catch {
-              Alert.alert("Error", "Failed to delete tournament. Please try again.");
-              setIsDeleting(false);
-            }
-          },
-        },
-      ]
-    );
-  };
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteTournament(id),
+    onSuccess: () => router.back(),
+    onError: () => {
+      setDeleteConfirmVisible(false);
+      Alert.alert("Error", "Failed to delete tournament. Please try again.");
+    },
+  });
+
+  const handleDelete = () => setDeleteConfirmVisible(true);
 
   const { data: result, isLoading, isError } = useQuery({
     queryKey: ["tournament", id],
@@ -199,7 +188,7 @@ export default function TournamentDetailScreen() {
               </Pressable>
               <Pressable
                 onPress={handleDelete}
-                disabled={isDeleting}
+                disabled={deleteMutation.isPending}
                 hitSlop={12}
                 accessibilityRole="button"
                 accessibilityLabel="Delete tournament"
@@ -249,7 +238,24 @@ export default function TournamentDetailScreen() {
               </View>
             )}
 
-            <SportConfigDisplay tournament={tournament} />
+            {tournament.sport.name.toLowerCase() === "cricket" && !!tournament.cricketTournamentConfig && (
+              <>
+                <Pressable
+                  onPress={() => setSportDetailsExpanded((prev) => !prev)}
+                  style={styles.sectionHeader}
+                  accessibilityRole="button"
+                  accessibilityLabel={sportDetailsExpanded ? "Collapse sport details" : "Expand sport details"}
+                >
+                  <Text style={styles.sectionTitle}>Details</Text>
+                  <Ionicons
+                    name={sportDetailsExpanded ? "chevron-up" : "chevron-down"}
+                    size={18}
+                    color={AppColors.textMuted}
+                  />
+                </Pressable>
+                {sportDetailsExpanded && <SportConfigDisplay tournament={tournament} />}
+              </>
+            )}
 
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Teams</Text>
@@ -358,6 +364,18 @@ export default function TournamentDetailScreen() {
             )}
           </ScrollView>
         )}
+
+        <ConfirmationModal
+          visible={deleteConfirmVisible}
+          title="Delete tournament"
+          message="Are you sure you want to delete this tournament? This cannot be undone."
+          confirmText="Delete"
+          destructive
+          isPending={deleteMutation.isPending}
+          pendingText="Deleting…"
+          onConfirm={() => deleteMutation.mutate()}
+          onCancel={() => setDeleteConfirmVisible(false)}
+        />
 
         {canSelfRegister && (
           <View style={styles.registerFooter}>

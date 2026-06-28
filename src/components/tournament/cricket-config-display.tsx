@@ -25,7 +25,6 @@ function DetailRow({ label, value }: { label: string; value: string | null | und
 export function CricketConfigDisplay({ config }: { config: CricketConfig }) {
   return (
     <>
-      <Text style={styles.sectionTitle}>Details</Text>
       <DetailRow
         label="Ground type"
         value={GROUND_TYPE_LABEL[config.groundType] ?? config.groundType}

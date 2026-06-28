@@ -47,7 +47,11 @@ export default function SportDetailsScreen() {
     queryClient.invalidateQueries({ queryKey: ["cricket-config", tournamentId] });
     queryClient.invalidateQueries({ queryKey: ["tournament", tournamentId] });
     draft.reset();
-    router.replace(`/tournaments/${tournamentId}`);
+    if (mode === "edit") {
+      router.back();
+    } else {
+      router.replace(`/tournaments/${tournamentId}`);
+    }
   };
 
   return (

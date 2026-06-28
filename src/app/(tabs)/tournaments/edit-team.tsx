@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -63,7 +63,22 @@ export default function EditTeamScreen() {
   const [partialCaptainPhone, setPartialCaptainPhone] = useState(false);
   const [partialViceCaptainPhone, setPartialViceCaptainPhone] = useState(false);
   const [partialOwnerPhone, setPartialOwnerPhone] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const updateMutation = useMutation({
+    mutationFn: (payload: Parameters<typeof updateTeam>[2]) =>
+      updateTeam(tournamentId, teamId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tournament", tournamentId] });
+      queryClient.invalidateQueries({ queryKey: ["team", tournamentId, teamId] });
+      router.back();
+    },
+    onError: (e) => {
+      const message =
+        e instanceof ApiError
+          ? (parseApiErrorMessage(e.body) ?? e.message)
+          : "Something went wrong. Please try again.";
+      Alert.alert("Failed to save team", message);
+    },
+  });
 
   useEffect(() => {
     if (team && !initialized) {
@@ -72,15 +87,15 @@ export default function EditTeamScreen() {
       setLogoUrl(team.logoUrl ?? "");
       setCaptain(team.captain ? toSelectedPerson(team.captain) : null);
       setViceCaptain(team.viceCaptain ? toSelectedPerson(team.viceCaptain) : null);
-      setOwner(toSelectedPerson(team.owner));
+      setOwner(team.owner ? toSelectedPerson(team.owner) : null);
       setInitialized(true);
     }
   }, [team, initialized]);
 
   const hasPartialPhone = partialCaptainPhone || partialViceCaptainPhone || partialOwnerPhone;
-  const canSubmit = name.trim().length > 0 && !hasPartialPhone && !isSubmitting;
+  const canSubmit = name.trim().length > 0 && !hasPartialPhone && !updateMutation.isPending;
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!canSubmit || !tournamentId || !teamId) return;
 
     const trimmedShortCode = shortCode.trim();
@@ -90,34 +105,20 @@ export default function EditTeamScreen() {
     }
 
     const toUserRef = (p: SelectedPerson) =>
-      p.userId ?? { name: p.name, phone: p.phone };
+      p.userId ? p.userId : { name: p.name, phone: p.phone };
 
     const effectiveCaptain = captain ?? pendingCaptain;
     const effectiveViceCaptain = viceCaptain ?? pendingViceCaptain;
     const effectiveOwner = owner ?? pendingOwner;
 
-    setIsSubmitting(true);
-    try {
-      await updateTeam(tournamentId, teamId, {
-        name: name.trim(),
-        shortCode: trimmedShortCode || undefined,
-        logoUrl: logoUrl.trim() || null,
-        captain: effectiveCaptain ? toUserRef(effectiveCaptain) : null,
-        viceCaptain: effectiveViceCaptain ? toUserRef(effectiveViceCaptain) : null,
-        ...(effectiveOwner ? { owner: toUserRef(effectiveOwner) } : {}),
-      });
-      await queryClient.invalidateQueries({ queryKey: ["tournament", tournamentId] });
-      await queryClient.invalidateQueries({ queryKey: ["team", tournamentId, teamId] });
-      router.back();
-    } catch (e) {
-      const message =
-        e instanceof ApiError
-          ? (parseApiErrorMessage(e.body) ?? e.message)
-          : "Something went wrong. Please try again.";
-      Alert.alert("Failed to save team", message);
-    } finally {
-      setIsSubmitting(false);
-    }
+    updateMutation.mutate({
+      name: name.trim(),
+      shortCode: trimmedShortCode || undefined,
+      logoUrl: logoUrl.trim() || null,
+      captain: effectiveCaptain ? toUserRef(effectiveCaptain) : null,
+      viceCaptain: effectiveViceCaptain ? toUserRef(effectiveViceCaptain) : null,
+      owner: effectiveOwner ? toUserRef(effectiveOwner) : null,
+    });
   };
 
   return (
@@ -222,7 +223,7 @@ export default function EditTeamScreen() {
               />
 
               <PrimaryButton
-                title={isSubmitting ? "Saving…" : "Save"}
+                title={updateMutation.isPending ? "Saving…" : "Save"}
                 onPress={handleSave}
                 disabled={!canSubmit}
                 style={styles.submitBtn}

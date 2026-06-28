@@ -26,12 +26,15 @@ export type TournamentPlayerDetail = {
   role: { id: string; name: string } | null;
 };
 
-export type CreatePlayerPayload = {
-  playerId: string;
+type CreatePlayerCommonFields = {
   roleId?: string;
   jerseyNumber?: number;
   jerseySize?: JerseySize;
 };
+
+export type CreatePlayerPayload =
+  | ({ userId: string } & CreatePlayerCommonFields)
+  | ({ phone: string; name: string } & CreatePlayerCommonFields);
 
 export type UpdatePlayerPayload = {
   roleId?: string | null;

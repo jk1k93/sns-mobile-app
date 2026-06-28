@@ -41,7 +41,7 @@ export type UpdateTeamPayload = {
   logoUrl?: string | null;
   captain?: UserRef | null;
   viceCaptain?: UserRef | null;
-  owner?: UserRef;
+  owner?: UserRef | null;
 };
 
 export type Team = {

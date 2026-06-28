@@ -128,6 +128,9 @@ export default function PlayersScreen() {
               await Promise.all([
                 queryClient.invalidateQueries({ queryKey: ["tournament-players", tournamentId] }),
                 queryClient.invalidateQueries({ queryKey: ["tournament", tournamentId] }),
+                // Partial key invalidates all teams in this tournament — removing a player
+                // may clear their captain/vice-captain role on the backend, so team cache must be refreshed.
+                queryClient.invalidateQueries({ queryKey: ["team", tournamentId] }),
               ]);
             } catch {
               Alert.alert("Error", "Failed to remove player. Please try again.");

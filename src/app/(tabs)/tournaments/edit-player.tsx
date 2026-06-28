@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -60,7 +60,22 @@ export default function EditPlayerScreen() {
   const [jerseySize, setJerseySize] = useState<JerseySize | null>(
     (currentJerseySize as JerseySize) ?? null
   );
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const updateMutation = useMutation({
+    mutationFn: (payload: Parameters<typeof updatePlayer>[2]) =>
+      updatePlayer(tournamentId, tournamentPlayerId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tournament-players", tournamentId] });
+      queryClient.invalidateQueries({ queryKey: ["tournament", tournamentId] });
+      router.back();
+    },
+    onError: (e) => {
+      const message =
+        e instanceof ApiError
+          ? (parseApiErrorMessage(e.body) ?? e.message)
+          : "Something went wrong. Please try again.";
+      Alert.alert("Failed to save", message);
+    },
+  });
 
   const { data: cricketRoles = [] } = useQuery({
     queryKey: ["cricket-roles"],
@@ -74,8 +89,8 @@ export default function EditPlayerScreen() {
     setJerseySize((currentJerseySize as JerseySize) ?? null);
   }, [currentRoleId, currentJerseyNumber, currentJerseySize]);
 
-  const handleSubmit = async () => {
-    if (isSubmitting) return;
+  const handleSubmit = () => {
+    if (updateMutation.isPending) return;
 
     const parsedJersey = jerseyNumber.trim() ? parseInt(jerseyNumber.trim(), 10) : undefined;
     if (jerseyNumber.trim() && (isNaN(parsedJersey!) || parsedJersey! < 0)) {
@@ -83,27 +98,11 @@ export default function EditPlayerScreen() {
       return;
     }
 
-    setIsSubmitting(true);
-    try {
-      await updatePlayer(tournamentId, tournamentPlayerId, {
-        roleId: roleId ?? null,
-        jerseyNumber: parsedJersey ?? null,
-        jerseySize: jerseySize ?? null,
-      });
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["tournament-players", tournamentId] }),
-        queryClient.invalidateQueries({ queryKey: ["tournament", tournamentId] }),
-      ]);
-      router.back();
-    } catch (e) {
-      const message =
-        e instanceof ApiError
-          ? (parseApiErrorMessage(e.body) ?? e.message)
-          : "Something went wrong. Please try again.";
-      Alert.alert("Failed to save", message);
-    } finally {
-      setIsSubmitting(false);
-    }
+    updateMutation.mutate({
+      roleId: roleId ?? null,
+      jerseyNumber: parsedJersey ?? null,
+      jerseySize: jerseySize ?? null,
+    });
   };
 
   return (
@@ -161,9 +160,9 @@ export default function EditPlayerScreen() {
             />
 
             <PrimaryButton
-              title={isSubmitting ? "Saving…" : "Save"}
+              title={updateMutation.isPending ? "Saving…" : "Save"}
               onPress={handleSubmit}
-              disabled={isSubmitting}
+              disabled={updateMutation.isPending}
               style={styles.submitBtn}
             />
           </ScrollView>

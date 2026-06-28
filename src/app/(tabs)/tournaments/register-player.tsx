@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -45,15 +45,31 @@ export default function RegisterPlayerScreen() {
   const [roleId, setRoleId] = useState<string | null>(null);
   const [jerseyNumber, setJerseyNumber] = useState("");
   const [jerseySize, setJerseySize] = useState<JerseySize | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const registerMutation = useMutation({
+    mutationFn: (payload: Parameters<typeof createPlayer>[1]) =>
+      createPlayer(tournamentId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tournament", tournamentId] });
+      queryClient.invalidateQueries({ queryKey: ["tournament-players", tournamentId] });
+      router.back();
+    },
+    onError: (e) => {
+      const message =
+        e instanceof ApiError
+          ? (parseApiErrorMessage(e.body) ?? e.message)
+          : "Something went wrong. Please try again.";
+      Alert.alert("Registration failed", message);
+    },
+  });
 
   const { data: cricketRoles = [] } = useQuery({
     queryKey: ["cricket-roles"],
     queryFn: () => fetchCricketRoles(true),
   });
 
-  const handleSubmit = async () => {
-    if (!tournamentId || !user?.id || isSubmitting) return;
+  const handleSubmit = () => {
+    if (!tournamentId || !user?.id || registerMutation.isPending) return;
 
     const parsedJersey = jerseyNumber.trim() ? parseInt(jerseyNumber.trim(), 10) : undefined;
     if (jerseyNumber.trim() && (isNaN(parsedJersey!) || parsedJersey! < 0)) {
@@ -61,28 +77,12 @@ export default function RegisterPlayerScreen() {
       return;
     }
 
-    setIsSubmitting(true);
-    try {
-      await createPlayer(tournamentId, {
-        playerId: user.id,
-        ...(roleId ? { roleId } : {}),
-        ...(parsedJersey !== undefined ? { jerseyNumber: parsedJersey } : {}),
-        ...(jerseySize ? { jerseySize } : {}),
-      });
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["tournament", tournamentId] }),
-        queryClient.invalidateQueries({ queryKey: ["tournament-players", tournamentId] }),
-      ]);
-      router.back();
-    } catch (e) {
-      const message =
-        e instanceof ApiError
-          ? (parseApiErrorMessage(e.body) ?? e.message)
-          : "Something went wrong. Please try again.";
-      Alert.alert("Registration failed", message);
-    } finally {
-      setIsSubmitting(false);
-    }
+    registerMutation.mutate({
+      userId: user.id,
+      ...(roleId ? { roleId } : {}),
+      ...(parsedJersey !== undefined ? { jerseyNumber: parsedJersey } : {}),
+      ...(jerseySize ? { jerseySize } : {}),
+    });
   };
 
   return (
@@ -138,9 +138,9 @@ export default function RegisterPlayerScreen() {
             />
 
             <PrimaryButton
-              title={isSubmitting ? "Registering…" : "Register"}
+              title={registerMutation.isPending ? "Registering…" : "Register"}
               onPress={handleSubmit}
-              disabled={isSubmitting}
+              disabled={registerMutation.isPending}
               style={styles.submitBtn}
             />
           </ScrollView>

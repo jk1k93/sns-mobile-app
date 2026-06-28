@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
@@ -63,7 +63,25 @@ export default function EditTournamentDetailsScreen() {
   const [registrationEndDate, setRegistrationEndDate] = useState<string | null>(null);
   const [description, setDescription] = useState("");
   const [contacts, setContacts] = useState<DraftContact[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const updateMutation = useMutation({
+    mutationFn: (payload: UpdateTournamentPayload) => updateTournament(tournamentId, payload),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["tournaments"] });
+      queryClient.invalidateQueries({ queryKey: ["tournament", tournamentId] });
+      router.replace({
+        pathname: "/tournaments/sport-details",
+        params: { tournamentId, mode: "edit", tournamentName: variables.name },
+      });
+    },
+    onError: (e) => {
+      const message =
+        e instanceof ApiError
+          ? (parseApiErrorMessage(e.body) ?? e.message)
+          : "Something went wrong. Please try again.";
+      Alert.alert("Failed to save tournament", message);
+    },
+  });
 
   useEffect(() => {
     if (!tournament) return;
@@ -117,14 +135,14 @@ export default function EditTournamentDetailsScreen() {
     return true;
   }, [name, venue, startDate, endDate, registrationStartDate, registrationEndDate]);
 
-  const onContinue = async () => {
-    if (!canContinue || isSubmitting || !tournamentId || !venue) return;
+  const onContinue = () => {
+    if (!canContinue || updateMutation.isPending || !tournamentId || !venue) return;
 
     const contactsPayload = contacts.map((c) =>
       c.userId ? { userId: c.userId } : { name: c.name, phone: c.phone }
     );
 
-    const payload: UpdateTournamentPayload = {
+    updateMutation.mutate({
       name: name.trim(),
       venueId: venue.id,
       ...(startDate ? { tournamentStartDate: startDate } : {}),
@@ -133,26 +151,7 @@ export default function EditTournamentDetailsScreen() {
       ...(registrationEndDate ? { registrationEndDate } : {}),
       ...(description.trim() ? { description: description.trim() } : {}),
       contacts: contactsPayload,
-    };
-
-    setIsSubmitting(true);
-    try {
-      await updateTournament(tournamentId, payload);
-      queryClient.invalidateQueries({ queryKey: ["tournaments"] });
-      queryClient.invalidateQueries({ queryKey: ["tournament", tournamentId] });
-      router.push({
-        pathname: "/tournaments/sport-details",
-        params: { tournamentId, mode: "edit", tournamentName: name.trim() },
-      });
-    } catch (e) {
-      const message =
-        e instanceof ApiError
-          ? (parseApiErrorMessage(e.body) ?? e.message)
-          : "Something went wrong. Please try again.";
-      Alert.alert("Failed to save tournament", message);
-    } finally {
-      setIsSubmitting(false);
-    }
+    });
   };
 
   return (
@@ -263,9 +262,9 @@ export default function EditTournamentDetailsScreen() {
               />
 
               <PrimaryButton
-                title={isSubmitting ? "Saving…" : "Continue"}
+                title={updateMutation.isPending ? "Saving…" : "Continue"}
                 onPress={onContinue}
-                disabled={!canContinue || isSubmitting}
+                disabled={!canContinue || updateMutation.isPending}
                 style={styles.continueBtn}
               />
             </ScrollView>

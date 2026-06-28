@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -47,8 +47,6 @@ export function CricketConfigForm({ tournamentId, onSave }: CricketConfigFormPro
   const [isAuctionBased, setIsAuctionBased] = useState<boolean | null>(null);
   const [auctionPurse, setAuctionPurse] = useState("");
   const [playerBasePrice, setPlayerBasePrice] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
   const { data: existingConfig, isLoading, isError } = useQuery({
     queryKey: ["cricket-config", tournamentId],
     queryFn: () => getCricketConfig(tournamentId),
@@ -80,10 +78,25 @@ export function CricketConfigForm({ tournamentId, onSave }: CricketConfigFormPro
     [groundType, ballType, numberOfTeams, playersPerTeam, isAuctionBased, auctionFieldsValid]
   );
 
-  const onSubmit = async () => {
-    if (!canSave || isSubmitting) return;
+  const saveMutation = useMutation({
+    mutationFn: (payload: Parameters<typeof createCricketConfig>[1]) =>
+      existingConfig
+        ? updateCricketConfig(tournamentId, payload)
+        : createCricketConfig(tournamentId, payload),
+    onSuccess: onSave,
+    onError: (e) => {
+      const message =
+        e instanceof ApiError
+          ? (parseApiErrorMessage(e.body) ?? e.message)
+          : "Something went wrong. Please try again.";
+      Alert.alert("Failed to save cricket details", message);
+    },
+  });
 
-    const payload = {
+  const onSubmit = () => {
+    if (!canSave || saveMutation.isPending) return;
+
+    saveMutation.mutate({
       groundType: groundType!,
       ballType: ballType!,
       numberOfTeams: parseInt(numberOfTeams, 10),
@@ -95,25 +108,7 @@ export function CricketConfigForm({ tournamentId, onSave }: CricketConfigFormPro
             playerBasePrice: parseInt(playerBasePrice, 10),
           }
         : {}),
-    };
-
-    setIsSubmitting(true);
-    try {
-      if (existingConfig) {
-        await updateCricketConfig(tournamentId, payload);
-      } else {
-        await createCricketConfig(tournamentId, payload);
-      }
-      onSave();
-    } catch (e) {
-      const message =
-        e instanceof ApiError
-          ? (parseApiErrorMessage(e.body) ?? e.message)
-          : "Something went wrong. Please try again.";
-      Alert.alert("Failed to save cricket details", message);
-    } finally {
-      setIsSubmitting(false);
-    }
+    });
   };
 
   if (isLoading) {
@@ -217,9 +212,9 @@ export function CricketConfigForm({ tournamentId, onSave }: CricketConfigFormPro
       )}
 
       <PrimaryButton
-        title={isSubmitting ? "Saving…" : "Save"}
+        title={saveMutation.isPending ? "Saving…" : "Save"}
         onPress={onSubmit}
-        disabled={!canSave || isSubmitting}
+        disabled={!canSave || saveMutation.isPending}
         style={styles.saveBtn}
       />
     </>

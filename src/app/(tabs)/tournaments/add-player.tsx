@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -15,7 +15,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { createPlayer, JERSEY_SIZES, type JerseySize } from "@/api/players";
+import { createPlayer, JERSEY_SIZES, type CreatePlayerPayload, type JerseySize } from "@/api/players";
 import { fetchCricketRoles } from "@/api/cricket-roles";
 import type { CricketPlayerProfileSummary } from "@/api/users";
 import { SinglePersonField, type SelectedPerson } from "@/components/team/single-person-field";
@@ -48,7 +48,22 @@ export default function AddPlayerScreen() {
   const [roleId, setRoleId] = useState<string | null>(null);
   const [jerseyNumber, setJerseyNumber] = useState("");
   const [jerseySize, setJerseySize] = useState<JerseySize | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const addMutation = useMutation({
+    mutationFn: (payload: CreatePlayerPayload) =>
+      createPlayer(tournamentId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tournament", tournamentId] });
+      queryClient.invalidateQueries({ queryKey: ["tournament-players", tournamentId] });
+      router.back();
+    },
+    onError: (e) => {
+      const message =
+        e instanceof ApiError
+          ? (parseApiErrorMessage(e.body) ?? e.message)
+          : "Something went wrong. Please try again.";
+      Alert.alert("Failed to add player", message);
+    },
+  });
 
   const { data: cricketRoles = [] } = useQuery({
     queryKey: ["cricket-roles"],
@@ -63,10 +78,10 @@ export default function AddPlayerScreen() {
   };
 
   const effectivePlayer = player ?? pendingPlayer;
-  const canSubmit = !!effectivePlayer?.userId && !partialPhone && !isSubmitting;
+  const canSubmit = !!effectivePlayer && !partialPhone && !addMutation.isPending;
 
-  const handleSubmit = async () => {
-    if (!canSubmit || !tournamentId || !effectivePlayer?.userId) return;
+  const handleSubmit = () => {
+    if (!canSubmit || !tournamentId || !effectivePlayer) return;
 
     const parsedJersey = jerseyNumber.trim() ? parseInt(jerseyNumber.trim(), 10) : undefined;
     if (jerseyNumber.trim() && (isNaN(parsedJersey!) || parsedJersey! < 0)) {
@@ -74,28 +89,17 @@ export default function AddPlayerScreen() {
       return;
     }
 
-    setIsSubmitting(true);
-    try {
-      await createPlayer(tournamentId, {
-        playerId: effectivePlayer.userId,
-        ...(roleId ? { roleId } : {}),
-        ...(parsedJersey !== undefined ? { jerseyNumber: parsedJersey } : {}),
-        ...(jerseySize ? { jerseySize } : {}),
-      });
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["tournament", tournamentId] }),
-        queryClient.invalidateQueries({ queryKey: ["tournament-players", tournamentId] }),
-      ]);
-      router.back();
-    } catch (e) {
-      const message =
-        e instanceof ApiError
-          ? (parseApiErrorMessage(e.body) ?? e.message)
-          : "Something went wrong. Please try again.";
-      Alert.alert("Failed to add player", message);
-    } finally {
-      setIsSubmitting(false);
-    }
+    const common = {
+      ...(roleId ? { roleId } : {}),
+      ...(parsedJersey !== undefined ? { jerseyNumber: parsedJersey } : {}),
+      ...(jerseySize ? { jerseySize } : {}),
+    };
+
+    addMutation.mutate(
+      effectivePlayer.userId
+        ? { userId: effectivePlayer.userId, ...common }
+        : { phone: effectivePlayer.phone, name: effectivePlayer.name, ...common }
+    );
   };
 
   return (
@@ -168,7 +172,7 @@ export default function AddPlayerScreen() {
             />
 
             <PrimaryButton
-              title={isSubmitting ? "Saving…" : "Save"}
+              title={addMutation.isPending ? "Saving…" : "Save"}
               onPress={handleSubmit}
               disabled={!canSubmit}
               style={styles.submitBtn}

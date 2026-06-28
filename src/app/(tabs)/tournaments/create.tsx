@@ -1,6 +1,7 @@
+import { useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -41,8 +42,36 @@ export default function TournamentCreateStep1Screen() {
   const router = useRouter();
   const { selectedSportId } = useSelectedSport();
   const draft = useTournamentDraft();
-  const [isSubmitting, setIsSubmitting] = useState(false);
   useHideTabBarWhileFocused();
+
+  const saveMutation = useMutation({
+    mutationFn: async (payload: CreateTournamentPayload) => {
+      const { tournamentId } = draft.draft;
+      if (tournamentId) {
+        await updateTournament(tournamentId, payload);
+        return { id: tournamentId, name: payload.name };
+      }
+      const tournament = await createTournament(payload);
+      return { id: tournament.id, name: payload.name };
+    },
+    onSuccess: ({ id, name }) => {
+      draft.markSaved(id);
+      router.replace({
+        pathname: "/tournaments/sport-details",
+        params: { tournamentId: id, tournamentName: name },
+      });
+    },
+    onError: (e) => {
+      const message =
+        e instanceof ApiError
+          ? (parseApiErrorMessage(e.body) ?? e.message)
+          : "Something went wrong. Please try again.";
+      Alert.alert(
+        draft.draft.tournamentId ? "Failed to save changes" : "Failed to create tournament",
+        message
+      );
+    },
+  });
 
   const startAsDate = useMemo(() => {
     if (!draft.draft.startDate) return undefined;
@@ -75,8 +104,8 @@ export default function TournamentCreateStep1Screen() {
     return true;
   }, [draft.draft]);
 
-  const onContinue = async () => {
-    if (!canContinue || isSubmitting) return;
+  const onContinue = () => {
+    if (!canContinue || saveMutation.isPending) return;
 
     const { name, venue, startDate, endDate, registrationStartDate, registrationEndDate, description, contacts } =
       draft.draft;
@@ -87,7 +116,7 @@ export default function TournamentCreateStep1Screen() {
       c.userId ? { userId: c.userId } : { name: c.name, phone: c.phone }
     );
 
-    const payload: CreateTournamentPayload = {
+    saveMutation.mutate({
       name: name.trim(),
       venueId: venue.id,
       sportId: selectedSportId,
@@ -97,37 +126,7 @@ export default function TournamentCreateStep1Screen() {
       ...(registrationEndDate ? { registrationEndDate } : {}),
       ...(description.trim() ? { description: description.trim() } : {}),
       ...(contactsPayload.length > 0 ? { contacts: contactsPayload } : {}),
-    };
-
-    setIsSubmitting(true);
-    try {
-      const { tournamentId } = draft.draft;
-      let id = tournamentId;
-
-      if (!id) {
-        const tournament = await createTournament(payload);
-        id = tournament.id;
-      } else {
-        await updateTournament(id, payload);
-      }
-      draft.markSaved(id);
-
-      router.push({
-        pathname: "/tournaments/sport-details",
-        params: { tournamentId: id, tournamentName: payload.name },
-      });
-    } catch (e) {
-      const message =
-        e instanceof ApiError
-          ? (parseApiErrorMessage(e.body) ?? e.message)
-          : "Something went wrong. Please try again.";
-      Alert.alert(
-        draft.draft.tournamentId ? "Failed to save changes" : "Failed to create tournament",
-        message
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
+    });
   };
 
   return (
@@ -223,15 +222,15 @@ export default function TournamentCreateStep1Screen() {
             <PrimaryButton
               title={
                 draft.draft.tournamentId
-                  ? isSubmitting
+                  ? saveMutation.isPending
                     ? "Saving…"
                     : "Continue"
-                  : isSubmitting
+                  : saveMutation.isPending
                     ? "Creating…"
                     : "Create tournament"
               }
               onPress={onContinue}
-              disabled={!canContinue || isSubmitting}
+              disabled={!canContinue || saveMutation.isPending}
               style={styles.continueBtn}
             />
           </ScrollView>
