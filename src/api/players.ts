@@ -12,6 +12,7 @@ export type TournamentPlayerDetail = {
   roleId: string | null;
   bidPrice: number | null;
   jerseyNumber: number | null;
+  jerseyName: string | null;
   jerseySize: JerseySize | null;
   isDeleted: boolean;
   createdAt: string;
@@ -27,8 +28,11 @@ export type TournamentPlayerDetail = {
 };
 
 type CreatePlayerCommonFields = {
+  teamId?: string;
+  bidPrice?: number;
   roleId?: string;
   jerseyNumber?: number;
+  jerseyName?: string;
   jerseySize?: JerseySize;
 };
 
@@ -39,12 +43,16 @@ export type CreatePlayerPayload =
 export type UpdatePlayerPayload = {
   roleId?: string | null;
   jerseyNumber?: number | null;
+  jerseyName?: string | null;
   jerseySize?: JerseySize | null;
 };
 
-export async function fetchPlayers(tournamentId: string): Promise<TournamentPlayerDetail[]> {
+export async function fetchPlayers(tournamentId: string, teamId?: string): Promise<TournamentPlayerDetail[]> {
+  const url = teamId
+    ? `/tournaments/${tournamentId}/players?teamId=${encodeURIComponent(teamId)}`
+    : `/tournaments/${tournamentId}/players`;
   const { data } = await apiFetchAuth<{ message: string; data: TournamentPlayerDetail[] }>(
-    `/tournaments/${tournamentId}/players`,
+    url,
     { method: 'GET' }
   );
   return data;

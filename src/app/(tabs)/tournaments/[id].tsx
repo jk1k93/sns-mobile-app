@@ -153,8 +153,9 @@ export default function TournamentDetailScreen() {
     !!user &&
     (tournament.organiserId === user.id ||
       tournament.contacts.some((c) => c.userId === user.id));
+  const isAuction = tournament?.cricketTournamentConfig?.auctionBased ?? false;
   const alreadyRegistered = !!user && players.some((p) => p.playerId === user.id);
-  const canSelfRegister = !!tournament && !!user && !canManage && !alreadyRegistered;
+  const canSelfRegister = !!tournament && !!user && isAuction && !canManage && !alreadyRegistered;
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -298,12 +299,12 @@ export default function TournamentDetailScreen() {
 
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Players</Text>
-              {canManage && (
+              {canManage && isAuction && (
                 <Pressable
                   onPress={() =>
                     router.push({
                       pathname: "/tournaments/add-player",
-                      params: { tournamentId: id, sportId: tournament.sportId },
+                      params: { tournamentId: id },
                     })
                   }
                   hitSlop={8}
@@ -331,9 +332,9 @@ export default function TournamentDetailScreen() {
                             params: {
                               tournamentId: id,
                               tournamentPlayerId: player.id,
-                              sportId: tournament.sportId,
                               currentRoleId: player.roleId ?? undefined,
                               currentJerseyNumber: player.jerseyNumber != null ? String(player.jerseyNumber) : undefined,
+                              currentJerseyName: player.jerseyName ?? undefined,
                               currentJerseySize: player.jerseySize ?? undefined,
                               playerName: player.player.name ?? player.player.phoneNumber,
                             },
@@ -347,7 +348,7 @@ export default function TournamentDetailScreen() {
                   onPress={() =>
                     router.push({
                       pathname: "/tournaments/players",
-                      params: { tournamentId: id, canManage: canManage ? "1" : "0", sportId: tournament.sportId },
+                      params: { tournamentId: id, canManage: canManage ? "1" : "0", title: tournament.name, isAuction: isAuction ? "1" : "0" },
                     })
                   }
                   style={styles.showAllBtn}
@@ -383,7 +384,7 @@ export default function TournamentDetailScreen() {
               onPress={() =>
                 router.push({
                   pathname: "/tournaments/register-player",
-                  params: { tournamentId: id, sportId: tournament!.sportId },
+                  params: { tournamentId: id },
                 })
               }
               style={({ pressed }) => [styles.registerBtn, pressed && styles.registerBtnPressed]}

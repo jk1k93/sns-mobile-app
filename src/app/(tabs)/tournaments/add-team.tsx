@@ -14,9 +14,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { createTeam } from "@/api/teams";
+import { fetchTournament } from "@/api/tournaments";
 import { SinglePersonField, type SelectedPerson } from "@/components/team/single-person-field";
 import { ThemedView } from "@/components/themed-view";
 import { PrimaryButton } from "@/components/ui/primary-button";
@@ -43,20 +44,25 @@ export default function AddTeamScreen() {
   const [name, setName] = useState("");
   const [shortCode, setShortCode] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
-  const [captain, setCaptain] = useState<SelectedPerson | null>(null);
-  const [viceCaptain, setViceCaptain] = useState<SelectedPerson | null>(null);
   const [owner, setOwner] = useState<SelectedPerson | null>(null);
-  const [pendingCaptain, setPendingCaptain] = useState<SelectedPerson | null>(null);
-  const [pendingViceCaptain, setPendingViceCaptain] = useState<SelectedPerson | null>(null);
   const [pendingOwner, setPendingOwner] = useState<SelectedPerson | null>(null);
-  const [partialCaptainPhone, setPartialCaptainPhone] = useState(false);
-  const [partialViceCaptainPhone, setPartialViceCaptainPhone] = useState(false);
   const [partialOwnerPhone, setPartialOwnerPhone] = useState(false);
+  const [captain, setCaptain] = useState<SelectedPerson | null>(null);
+  const [pendingCaptain, setPendingCaptain] = useState<SelectedPerson | null>(null);
+  const [partialCaptainPhone, setPartialCaptainPhone] = useState(false);
+
+  const { data: tournamentResult } = useQuery({
+    queryKey: ["tournament", tournamentId],
+    queryFn: () => fetchTournament(tournamentId),
+    enabled: !!tournamentId,
+  });
+  const isAuction = tournamentResult?.tournament.cricketTournamentConfig?.auctionBased ?? false;
   const createMutation = useMutation({
     mutationFn: (payload: Parameters<typeof createTeam>[1]) =>
       createTeam(tournamentId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tournament", tournamentId] });
+      queryClient.invalidateQueries({ queryKey: ["tournament-players", tournamentId] });
       router.back();
     },
     onError: (e) => {
@@ -68,7 +74,7 @@ export default function AddTeamScreen() {
     },
   });
 
-  const hasPartialPhone = partialCaptainPhone || partialViceCaptainPhone || partialOwnerPhone;
+  const hasPartialPhone = partialOwnerPhone || (!isAuction && partialCaptainPhone);
   const canSubmit = name.trim().length > 0 && !hasPartialPhone && !createMutation.isPending;
 
   const handleSubmit = () => {
@@ -83,17 +89,15 @@ export default function AddTeamScreen() {
     const toUserRef = (p: SelectedPerson) =>
       p.userId ? p.userId : { name: p.name, phone: p.phone };
 
-    const effectiveCaptain = captain ?? pendingCaptain;
-    const effectiveViceCaptain = viceCaptain ?? pendingViceCaptain;
     const effectiveOwner = owner ?? pendingOwner;
+    const effectiveCaptain = captain ?? pendingCaptain;
 
     createMutation.mutate({
       name: name.trim(),
       ...(trimmedShortCode ? { shortCode: trimmedShortCode } : {}),
       ...(logoUrl.trim() ? { logoUrl: logoUrl.trim() } : {}),
-      ...(effectiveCaptain ? { captain: toUserRef(effectiveCaptain) } : {}),
-      ...(effectiveViceCaptain ? { viceCaptain: toUserRef(effectiveViceCaptain) } : {}),
       ...(effectiveOwner ? { owner: toUserRef(effectiveOwner) } : {}),
+      ...(!isAuction && effectiveCaptain ? { captain: toUserRef(effectiveCaptain) } : {}),
     });
   };
 
@@ -161,21 +165,15 @@ export default function AddTeamScreen() {
               returnKeyType="done"
             />
 
-            <SinglePersonField
-              label="Captain"
-              value={captain}
-              onChange={setCaptain}
-              onPendingChange={setPendingCaptain}
-              onPartialPhoneChange={setPartialCaptainPhone}
-            />
-
-            <SinglePersonField
-              label="Vice-captain"
-              value={viceCaptain}
-              onChange={setViceCaptain}
-              onPendingChange={setPendingViceCaptain}
-              onPartialPhoneChange={setPartialViceCaptainPhone}
-            />
+            {!isAuction && (
+              <SinglePersonField
+                label="Captain"
+                value={captain}
+                onChange={setCaptain}
+                onPendingChange={setPendingCaptain}
+                onPartialPhoneChange={setPartialCaptainPhone}
+              />
+            )}
 
             <SinglePersonField
               label="Owner"
@@ -184,6 +182,8 @@ export default function AddTeamScreen() {
               onPendingChange={setPendingOwner}
               onPartialPhoneChange={setPartialOwnerPhone}
             />
+
+
 
             <PrimaryButton
               title={createMutation.isPending ? "Saving…" : "Save"}

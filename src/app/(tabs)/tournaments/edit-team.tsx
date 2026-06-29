@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -17,6 +17,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { fetchTeam, updateTeam, type TeamUserSummary } from "@/api/teams";
+import { fetchTournament } from "@/api/tournaments";
 import { SinglePersonField, type SelectedPerson } from "@/components/team/single-person-field";
 import { ThemedView } from "@/components/themed-view";
 import { PrimaryButton } from "@/components/ui/primary-button";
@@ -54,21 +55,26 @@ export default function EditTeamScreen() {
   const [name, setName] = useState("");
   const [shortCode, setShortCode] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
-  const [captain, setCaptain] = useState<SelectedPerson | null>(null);
-  const [viceCaptain, setViceCaptain] = useState<SelectedPerson | null>(null);
   const [owner, setOwner] = useState<SelectedPerson | null>(null);
-  const [pendingCaptain, setPendingCaptain] = useState<SelectedPerson | null>(null);
-  const [pendingViceCaptain, setPendingViceCaptain] = useState<SelectedPerson | null>(null);
   const [pendingOwner, setPendingOwner] = useState<SelectedPerson | null>(null);
-  const [partialCaptainPhone, setPartialCaptainPhone] = useState(false);
-  const [partialViceCaptainPhone, setPartialViceCaptainPhone] = useState(false);
   const [partialOwnerPhone, setPartialOwnerPhone] = useState(false);
+  const [captain, setCaptain] = useState<SelectedPerson | null>(null);
+  const [pendingCaptain, setPendingCaptain] = useState<SelectedPerson | null>(null);
+  const [partialCaptainPhone, setPartialCaptainPhone] = useState(false);
+
+  const { data: tournamentResult } = useQuery({
+    queryKey: ["tournament", tournamentId],
+    queryFn: () => fetchTournament(tournamentId),
+    enabled: !!tournamentId,
+  });
+  const isAuction = tournamentResult?.tournament.cricketTournamentConfig?.auctionBased ?? false;
   const updateMutation = useMutation({
     mutationFn: (payload: Parameters<typeof updateTeam>[2]) =>
       updateTeam(tournamentId, teamId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tournament", tournamentId] });
       queryClient.invalidateQueries({ queryKey: ["team", tournamentId, teamId] });
+      queryClient.invalidateQueries({ queryKey: ["tournament-players", tournamentId] });
       router.back();
     },
     onError: (e) => {
@@ -85,14 +91,13 @@ export default function EditTeamScreen() {
       setName(team.name);
       setShortCode(team.shortCode ?? "");
       setLogoUrl(team.logoUrl ?? "");
-      setCaptain(team.captain ? toSelectedPerson(team.captain) : null);
-      setViceCaptain(team.viceCaptain ? toSelectedPerson(team.viceCaptain) : null);
       setOwner(team.owner ? toSelectedPerson(team.owner) : null);
+      setCaptain(team.captain ? toSelectedPerson(team.captain) : null);
       setInitialized(true);
     }
   }, [team, initialized]);
 
-  const hasPartialPhone = partialCaptainPhone || partialViceCaptainPhone || partialOwnerPhone;
+  const hasPartialPhone = partialOwnerPhone || (!isAuction && partialCaptainPhone);
   const canSubmit = name.trim().length > 0 && !hasPartialPhone && !updateMutation.isPending;
 
   const handleSave = () => {
@@ -107,17 +112,15 @@ export default function EditTeamScreen() {
     const toUserRef = (p: SelectedPerson) =>
       p.userId ? p.userId : { name: p.name, phone: p.phone };
 
-    const effectiveCaptain = captain ?? pendingCaptain;
-    const effectiveViceCaptain = viceCaptain ?? pendingViceCaptain;
     const effectiveOwner = owner ?? pendingOwner;
+    const effectiveCaptain = captain ?? pendingCaptain;
 
     updateMutation.mutate({
       name: name.trim(),
       shortCode: trimmedShortCode || undefined,
       logoUrl: logoUrl.trim() || null,
-      captain: effectiveCaptain ? toUserRef(effectiveCaptain) : null,
-      viceCaptain: effectiveViceCaptain ? toUserRef(effectiveViceCaptain) : null,
       owner: effectiveOwner ? toUserRef(effectiveOwner) : null,
+      ...(!isAuction ? { captain: effectiveCaptain ? toUserRef(effectiveCaptain) : null } : {}),
     });
   };
 
@@ -198,22 +201,16 @@ export default function EditTeamScreen() {
                 returnKeyType="done"
               />
 
-              <SinglePersonField
-                label="Captain"
-                value={captain}
-                onChange={setCaptain}
-                onPendingChange={setPendingCaptain}
-                onPartialPhoneChange={setPartialCaptainPhone}
-              />
-
-              <SinglePersonField
-                label="Vice-captain"
-                value={viceCaptain}
-                onChange={setViceCaptain}
-                onPendingChange={setPendingViceCaptain}
-                onPartialPhoneChange={setPartialViceCaptainPhone}
-              />
-
+              {!isAuction && (
+                <SinglePersonField
+                  label="Captain"
+                  value={captain}
+                  onChange={setCaptain}
+                  onPendingChange={setPendingCaptain}
+                  onPartialPhoneChange={setPartialCaptainPhone}
+                />
+              )}
+              
               <SinglePersonField
                 label="Owner"
                 value={owner}
@@ -221,6 +218,7 @@ export default function EditTeamScreen() {
                 onPendingChange={setPendingOwner}
                 onPartialPhoneChange={setPartialOwnerPhone}
               />
+
 
               <PrimaryButton
                 title={updateMutation.isPending ? "Saving…" : "Save"}

@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,8 +13,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { deleteTeam, fetchTeam, type TeamUserSummary } from "@/api/teams";
+import { fetchTournament } from "@/api/tournaments";
+import { ConfirmationModal } from "@/components/confirmation-modal";
 import { ThemedView } from "@/components/themed-view";
 import { AppColors } from "@/constants/app-colors";
+import { useAuth } from "@/contexts/auth-context";
 import { useHideTabBarWhileFocused } from "@/hooks/use-hide-tab-bar";
 
 function DetailRow({ label, value }: { label: string; value: string | null | undefined }) {
@@ -30,6 +33,14 @@ function personDisplay(u: TeamUserSummary): string {
   return u.name ? `${u.name} · ${u.phoneNumber}` : u.phoneNumber;
 }
 
+function isCaptain(team: { captain: TeamUserSummary | null }, userId: string) {
+  return team.captain?.id === userId;
+}
+
+function isOwner(team: { owner: TeamUserSummary | null }, userId: string) {
+  return team.owner?.id === userId;
+}
+
 export default function TeamDetailsScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -38,7 +49,8 @@ export default function TeamDetailsScreen() {
     teamId: string;
     canManage: string;
   }>();
-  const canManageTeam = canManage === "1";
+  const { user } = useAuth();
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
   useHideTabBarWhileFocused();
 
   const { data: team, isLoading, isError } = useQuery({
@@ -47,27 +59,30 @@ export default function TeamDetailsScreen() {
     enabled: !!tournamentId && !!teamId,
   });
 
+  const { data: tournamentResult } = useQuery({
+    queryKey: ["tournament", tournamentId],
+    queryFn: () => fetchTournament(tournamentId),
+    enabled: !!tournamentId,
+  });
+  const isAuction = tournamentResult?.tournament.cricketTournamentConfig?.auctionBased ?? false;
+
+  const canManageTeam =
+    canManage === "1" ||
+    (!!user && !!team && (isCaptain(team, user.id) || isOwner(team, user.id)));
+
   const deleteTeamMutation = useMutation({
     mutationFn: () => deleteTeam(tournamentId, teamId),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["tournament", tournamentId] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["tournament", tournamentId] }),
+        queryClient.invalidateQueries({ queryKey: ["tournament-players", tournamentId] }),
+      ]);
       router.back();
     },
     onError: () => {
-      Alert.alert("Failed to delete team", "Something went wrong. Please try again.");
+      setDeleteConfirmVisible(false);
     },
   });
-
-  const handleDelete = () => {
-    Alert.alert(
-      "Delete team",
-      `Remove "${team?.name}" from this tournament?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: () => deleteTeamMutation.mutate() },
-      ]
-    );
-  };
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -100,7 +115,7 @@ export default function TeamDetailsScreen() {
                 <Ionicons name="pencil" size={20} color={AppColors.primary} />
               </Pressable>
               <Pressable
-                onPress={handleDelete}
+                onPress={() => setDeleteConfirmVisible(true)}
                 disabled={deleteTeamMutation.isPending}
                 hitSlop={12}
                 accessibilityRole="button"
@@ -132,19 +147,49 @@ export default function TeamDetailsScreen() {
             {team.shortCode ? <DetailRow label="Short code" value={team.shortCode} /> : null}
             {team.logoUrl ? <DetailRow label="Logo URL" value={team.logoUrl} /> : null}
             <DetailRow
-              label="Captain"
-              value={team.captain ? personDisplay(team.captain) : null}
-            />
-            <DetailRow
-              label="Vice-captain"
-              value={team.viceCaptain ? personDisplay(team.viceCaptain) : null}
-            />
-            <DetailRow
               label="Owner"
               value={team.owner ? personDisplay(team.owner) : null}
             />
+            {!isAuction && team.captain && (
+              <DetailRow
+                label="Captain"
+                value={personDisplay(team.captain)}
+              />
+            )}
+            <Pressable
+              style={styles.playersRow}
+              onPress={() =>
+                router.push({
+                  pathname: "/tournaments/players",
+                  params: {
+                    tournamentId,
+                    teamId,
+                    canManage: canManageTeam ? "1" : "0",
+                    title: team.name,
+                    captainId: team.captain?.id ?? undefined,
+                  },
+                })
+              }
+              accessibilityRole="button"
+              accessibilityLabel="View players"
+            >
+              <Text style={styles.playersRowLabel}>Players</Text>
+              <Ionicons name="chevron-forward" size={18} color={AppColors.primary} />
+            </Pressable>
           </ScrollView>
         )}
+
+        <ConfirmationModal
+          visible={deleteConfirmVisible}
+          title="Delete team"
+          message={`Remove "${team?.name}" from this tournament?`}
+          confirmText="Delete"
+          destructive
+          isPending={deleteTeamMutation.isPending}
+          pendingText="Deleting…"
+          onConfirm={() => deleteTeamMutation.mutate()}
+          onCancel={() => setDeleteConfirmVisible(false)}
+        />
       </ThemedView>
     </SafeAreaView>
   );
@@ -208,6 +253,19 @@ const styles = StyleSheet.create({
   },
   rowValue: {
     fontSize: 15,
+    color: AppColors.textDark,
+  },
+  playersRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#E0E0E0",
+  },
+  playersRowLabel: {
+    fontSize: 15,
+    fontWeight: "600",
     color: AppColors.textDark,
   },
 });

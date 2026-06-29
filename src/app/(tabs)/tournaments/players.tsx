@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import {
-  Alert,
+  ActivityIndicator,
   FlatList,
   Platform,
   Pressable,
@@ -11,11 +11,11 @@ import {
   Text,
   TextInput,
   View,
-  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { deletePlayer, fetchPlayers, type TournamentPlayerDetail } from "@/api/players";
+import { ConfirmationModal } from "@/components/confirmation-modal";
 import { ThemedView } from "@/components/themed-view";
 import { AppColors } from "@/constants/app-colors";
 import { useAuth } from "@/contexts/auth-context";
@@ -25,16 +25,18 @@ function PlayerRow({
   player,
   canManage,
   canEdit,
+  isCaptain,
   onPress,
   onDelete,
 }: {
   player: TournamentPlayerDetail;
   canManage: boolean;
   canEdit: boolean;
+  isCaptain: boolean;
   onPress: () => void;
   onDelete: () => void;
 }) {
-  const displayName = player.player.name ?? player.player.phoneNumber;
+  const displayName = (player.player.name ?? player.player.phoneNumber) + (isCaptain ? " (c)" : "");
   const initials = displayName
     .split(" ")
     .slice(0, 2)
@@ -82,21 +84,26 @@ function PlayerRow({
 export default function PlayersScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { tournamentId, canManage: canManageParam, sportId } = useLocalSearchParams<{
+  const { tournamentId, canManage: canManageParam, teamId, title, captainId, isAuction: isAuctionParam } = useLocalSearchParams<{
     tournamentId: string;
     canManage?: string;
-    sportId?: string;
+    teamId?: string;
+    title?: string;
+    captainId?: string;
+    isAuction?: string;
   }>();
   useHideTabBarWhileFocused();
 
   const canManage = canManageParam === "1";
+  const canAddPlayer = canManage && (!!teamId || isAuctionParam === "1");
   const { accessToken, user } = useAuth();
   const [search, setSearch] = useState("");
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<TournamentPlayerDetail | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const { data: players = [], isLoading, isError, refetch } = useQuery({
-    queryKey: ["tournament-players", tournamentId],
-    queryFn: () => fetchPlayers(tournamentId),
+    queryKey: ["tournament-players", tournamentId, teamId ?? null],
+    queryFn: () => fetchPlayers(tournamentId, teamId),
     enabled: !!accessToken && !!tournamentId,
   });
 
@@ -111,36 +118,20 @@ export default function PlayersScreen() {
     });
   }, [players, search]);
 
-  const handleDelete = (player: TournamentPlayerDetail) => {
-    const displayName = player.player.name ?? player.player.phoneNumber;
-    Alert.alert(
-      "Remove player",
-      `Remove ${displayName} from this tournament?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: async () => {
-            setDeletingId(player.id);
-            try {
-              await deletePlayer(tournamentId, player.id);
-              await Promise.all([
-                queryClient.invalidateQueries({ queryKey: ["tournament-players", tournamentId] }),
-                queryClient.invalidateQueries({ queryKey: ["tournament", tournamentId] }),
-                // Partial key invalidates all teams in this tournament — removing a player
-                // may clear their captain/vice-captain role on the backend, so team cache must be refreshed.
-                queryClient.invalidateQueries({ queryKey: ["team", tournamentId] }),
-              ]);
-            } catch {
-              Alert.alert("Error", "Failed to remove player. Please try again.");
-            } finally {
-              setDeletingId(null);
-            }
-          },
-        },
-      ]
-    );
+  const handleDeleteConfirm = async () => {
+    if (!pendingDelete) return;
+    setIsDeleting(true);
+    try {
+      await deletePlayer(tournamentId, pendingDelete.id);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["tournament-players", tournamentId] }),
+        queryClient.invalidateQueries({ queryKey: ["tournament", tournamentId] }),
+        queryClient.invalidateQueries({ queryKey: ["team", tournamentId] }),
+      ]);
+      setPendingDelete(null);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -155,8 +146,24 @@ export default function PlayersScreen() {
           >
             <Ionicons name="arrow-back" size={24} color={AppColors.textDark} />
           </Pressable>
-          <Text style={styles.headerTitle}>Players</Text>
-          <View style={styles.headerSpacer} />
+          <Text style={styles.headerTitle} numberOfLines={1}>{title ?? "Players"}</Text>
+          {canAddPlayer ? (
+            <Pressable
+              onPress={() =>
+                router.push({
+                  pathname: "/tournaments/add-player",
+                  params: { tournamentId, ...(teamId ? { teamId } : {}) },
+                })
+              }
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Add player"
+            >
+              <Ionicons name="add-circle-outline" size={24} color={AppColors.primary} />
+            </Pressable>
+          ) : (
+            <View style={styles.headerSpacer} />
+          )}
         </View>
 
         <View style={styles.searchWrap}>
@@ -198,23 +205,24 @@ export default function PlayersScreen() {
             renderItem={({ item }) => (
               <PlayerRow
                 player={item}
-                canManage={canManage && deletingId !== item.id}
+                canManage={canManage && pendingDelete?.id !== item.id}
                 canEdit={canManage || item.playerId === user?.id}
+                isCaptain={!!captainId && item.playerId === captainId}
                 onPress={() =>
                   router.push({
                     pathname: "/tournaments/edit-player",
                     params: {
                       tournamentId,
                       tournamentPlayerId: item.id,
-                      sportId,
                       currentRoleId: item.roleId ?? undefined,
                       currentJerseyNumber: item.jerseyNumber != null ? String(item.jerseyNumber) : undefined,
+                      currentJerseyName: item.jerseyName ?? undefined,
                       currentJerseySize: item.jerseySize ?? undefined,
                       playerName: item.player.name ?? item.player.phoneNumber,
                     },
                   })
                 }
-                onDelete={() => handleDelete(item)}
+                onDelete={() => setPendingDelete(item)}
               />
             )}
             contentContainerStyle={styles.list}
@@ -228,6 +236,18 @@ export default function PlayersScreen() {
             keyboardShouldPersistTaps="handled"
           />
         )}
+
+        <ConfirmationModal
+          visible={!!pendingDelete}
+          title="Remove player"
+          message={`Remove ${pendingDelete?.player.name ?? pendingDelete?.player.phoneNumber} from this tournament?`}
+          confirmText="Remove"
+          destructive
+          isPending={isDeleting}
+          pendingText="Removing…"
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setPendingDelete(null)}
+        />
       </ThemedView>
     </SafeAreaView>
   );

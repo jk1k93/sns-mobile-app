@@ -11,6 +11,7 @@ import {
 
 import { searchUserByPhone, type CricketPlayerProfileSummary } from "@/api/users";
 import { AppColors } from "@/constants/app-colors";
+import { useSelectedSport } from "@/contexts/selected-sport-context";
 
 const SEARCH_DEBOUNCE_MS = 500;
 
@@ -30,13 +31,12 @@ type SinglePersonFieldProps = {
   onPartialPhoneChange?: (isPartial: boolean) => void;
   /** Fires with the in-progress person while name is being typed (not yet confirmed). Null when cleared. */
   onPendingChange?: (pending: SelectedPerson | null) => void;
-  /** When provided, included in the phone search to enrich the result with sport-specific profile data. */
-  sportId?: string;
   /** Fires with the sport-specific profile when a registered user is found. Null if no profile exists. */
   onProfileFound?: (profile: CricketPlayerProfileSummary | null) => void;
 };
 
-export function SinglePersonField({ label, value, onChange, onPartialPhoneChange, onPendingChange, sportId, onProfileFound }: SinglePersonFieldProps) {
+export function SinglePersonField({ label, value, onChange, onPartialPhoneChange, onPendingChange, onProfileFound }: SinglePersonFieldProps) {
+  const { selectedSportId } = useSelectedSport();
   const [phone, setPhone] = useState("");
   const [nameInput, setNameInput] = useState("");
   const [status, setStatus] = useState<SearchStatus>("idle");
@@ -45,12 +45,12 @@ export function SinglePersonField({ label, value, onChange, onPartialPhoneChange
   const onPartialPhoneChangeRef = useRef(onPartialPhoneChange);
   const onPendingChangeRef = useRef(onPendingChange);
   const onProfileFoundRef = useRef(onProfileFound);
-  const sportIdRef = useRef(sportId);
+  const selectedSportIdRef = useRef(selectedSportId);
   useEffect(() => { onChangeRef.current = onChange; });
   useEffect(() => { onPartialPhoneChangeRef.current = onPartialPhoneChange; });
   useEffect(() => { onPendingChangeRef.current = onPendingChange; });
   useEffect(() => { onProfileFoundRef.current = onProfileFound; });
-  useEffect(() => { sportIdRef.current = sportId; });
+  useEffect(() => { selectedSportIdRef.current = selectedSportId; });
 
   const phoneDigitCount = (phone.match(/\d/g) ?? []).length;
   const isPhonePartial =
@@ -78,7 +78,7 @@ export function SinglePersonField({ label, value, onChange, onPartialPhoneChange
     debounceRef.current = setTimeout(async () => {
       if (cancelled) return;
       try {
-        const user = await searchUserByPhone(trimmed, sportIdRef.current);
+        const user = await searchUserByPhone(trimmed, selectedSportIdRef.current ?? undefined);
         if (cancelled) return;
         if (user) {
           onChangeRef.current({

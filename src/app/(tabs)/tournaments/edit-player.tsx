@@ -42,14 +42,15 @@ export default function EditPlayerScreen() {
     tournamentPlayerId,
     currentRoleId,
     currentJerseyNumber,
+    currentJerseyName,
     currentJerseySize,
     playerName,
   } = useLocalSearchParams<{
     tournamentId: string;
     tournamentPlayerId: string;
-    sportId?: string;
     currentRoleId?: string;
     currentJerseyNumber?: string;
+    currentJerseyName?: string;
     currentJerseySize?: string;
     playerName?: string;
   }>();
@@ -57,6 +58,7 @@ export default function EditPlayerScreen() {
 
   const [roleId, setRoleId] = useState<string | null>(currentRoleId ?? null);
   const [jerseyNumber, setJerseyNumber] = useState(currentJerseyNumber ?? "");
+  const [jerseyName, setJerseyName] = useState(currentJerseyName ?? playerName ?? "");
   const [jerseySize, setJerseySize] = useState<JerseySize | null>(
     (currentJerseySize as JerseySize) ?? null
   );
@@ -86,8 +88,9 @@ export default function EditPlayerScreen() {
   useEffect(() => {
     setRoleId(currentRoleId ?? null);
     setJerseyNumber(currentJerseyNumber ?? "");
+    setJerseyName(currentJerseyName ?? playerName ?? "");
     setJerseySize((currentJerseySize as JerseySize) ?? null);
-  }, [currentRoleId, currentJerseyNumber, currentJerseySize]);
+  }, [currentRoleId, currentJerseyNumber, currentJerseyName, currentJerseySize, playerName]);
 
   const handleSubmit = () => {
     if (updateMutation.isPending) return;
@@ -101,6 +104,7 @@ export default function EditPlayerScreen() {
     updateMutation.mutate({
       roleId: roleId ?? null,
       jerseyNumber: parsedJersey ?? null,
+      jerseyName: jerseyName.trim() || null,
       jerseySize: jerseySize ?? null,
     });
   };
@@ -149,6 +153,18 @@ export default function EditPlayerScreen() {
               placeholderTextColor={AppColors.placeholder}
               style={styles.input}
               keyboardType="number-pad"
+              returnKeyType="done"
+            />
+
+            <Text style={styles.fieldLabel}>Jersey name</Text>
+            <TextInput
+              value={jerseyName}
+              onChangeText={setJerseyName}
+              placeholder="e.g. JK"
+              placeholderTextColor={AppColors.placeholder}
+              style={styles.input}
+              autoCorrect={false}
+              autoCapitalize="characters"
               returnKeyType="done"
             />
 
